@@ -119,6 +119,36 @@ cmake --build . --parallel
 - `neufox-2fa-x86.dll` - 32-bit (static OpenSSL)
 - `neufox-2fa-x64.dll` - 64-bit (static OpenSSL)
 
+## Release Process
+
+Releases are created manually using GitHub Actions with version management:
+
+1. Go to [Actions → Release](../../actions/workflows/release.yml)
+2. Click "Run workflow"
+3. Enter the base version (e.g., `1.0.0`, `1.1.0`)
+4. Select release type:
+   - `beta` - Beta pre-release (for testing)
+   - `release-candidate` - Release Candidate (for final testing)
+   - `stable` - Stable release
+5. Click "Run workflow"
+
+The build number (total commit count) is automatically appended to create the final version (e.g., `v1.0.123`).
+
+**Example:**
+- Base version: `1.0.0`
+- Build number: `123`
+- Final version: `v1.0.123`
+- Release name: `Beta v1.0.123` or `RC v1.0.123` or `v1.0.123` (for stable)
+
+All builds are packaged with the proper folder structure:
+```
+neufox-2fa-{platform}-{arch}-{version}.zip
+├── components/
+│   └── neufox-2fa-*.dll/.so
+└── include/
+    └── neufox-2fa.inc
+```
+
 ## Installation
 
 1. Download the appropriate build for your platform

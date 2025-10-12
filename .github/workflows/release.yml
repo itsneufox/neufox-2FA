@@ -1,0 +1,310 @@
+name: Release
+
+permissions:
+  contents: write
+  pull-requests: read
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Base version (e.g., 1.0.0, 1.1.0)'
+        required: true
+        type: string
+        default: '1.0.0'
+      release_type:
+        description: 'Release type'
+        required: true
+        type: choice
+        options:
+          - beta
+          - release-candidate
+          - stable
+
+jobs:
+  prepare-version:
+    name: Prepare Version
+    runs-on: ubuntu-latest
+    outputs:
+      build_version: ${{ steps.vars.outputs.build_version }}
+      build_number: ${{ steps.vars.outputs.build_number }}
+      tag_name: ${{ steps.vars.outputs.tag_name }}
+      release_name: ${{ steps.vars.outputs.release_name }}
+      base_version: ${{ steps.vars.outputs.base_version }}
+      is_prerelease: ${{ steps.vars.outputs.is_prerelease }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+        
+      - name: Declare build output variables
+        id: vars
+        shell: bash
+        run: |
+          # Get build number from total commits
+          build_number=$(git rev-list --count HEAD)
+          
+          # Get base version from input
+          base_version="${{ github.event.inputs.version }}"
+          
+          # Ensure base_version has at least major.minor format
+          if [[ -z "$base_version" ]]; then
+            base_version="1.0.0"
+          fi
+          
+          # Extract major.minor from base version (e.g., 1.0.0 -> 1.0)
+          major_minor="${base_version%.*}"
+          if [[ "$major_minor" == "$base_version" ]]; then
+            # If no patch version found, assume it's already major.minor
+            major_minor="$base_version"
+          fi
+          
+          # Create version with build number as patch: v1.0.123
+          full_version="v${major_minor}.${build_number}"
+          
+          # Use build number tags for all releases
+          tag_name="${full_version}"
+          
+          # Create release name based on release type
+          if [ "${{ github.event.inputs.release_type }}" = "stable" ]; then
+            release_name="v${major_minor}.${build_number}"
+            is_prerelease="false"
+          elif [ "${{ github.event.inputs.release_type }}" = "beta" ]; then
+            release_name="Beta v${major_minor}.${build_number}"
+            is_prerelease="true"
+          else
+            release_name="RC v${major_minor}.${build_number}"
+            is_prerelease="true"
+          fi
+          
+          echo "build_version=${full_version}" >> $GITHUB_OUTPUT
+          echo "build_number=${build_number}" >> $GITHUB_OUTPUT
+          echo "tag_name=${tag_name}" >> $GITHUB_OUTPUT
+          echo "release_name=${release_name}" >> $GITHUB_OUTPUT
+          echo "base_version=${base_version}" >> $GITHUB_OUTPUT
+          echo "is_prerelease=${is_prerelease}" >> $GITHUB_OUTPUT
+          
+          echo "Version: ${full_version}"
+          echo "Tag: ${tag_name}"
+          echo "Release Name: ${release_name}"
+          echo "Is Prerelease: ${is_prerelease}"
+
+  build-windows:
+    name: Build Windows
+    needs: prepare-version
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        arch: [x64, Win32]
+        config: [RelWithDebInfo]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    
+    - name: Setup vcpkg
+      run: |
+        git clone https://github.com/Microsoft/vcpkg.git
+        cd vcpkg
+        .\bootstrap-vcpkg.bat
+      shell: cmd
+    
+    - name: Install dependencies
+      run: |
+        $triplet = if ("${{ matrix.arch }}" -eq "Win32") { "x86-windows-static" } else { "x64-windows-static" }
+        Write-Host "Installing dependencies for triplet: $triplet"
+        .\vcpkg\vcpkg.exe install glm:$triplet robin-hood-hashing:$triplet span-lite:$triplet string-view-lite:$triplet openssl:$triplet --triplet $triplet
+        if ($LASTEXITCODE -ne 0) {
+          Write-Error "vcpkg install failed with exit code $LASTEXITCODE"
+          exit $LASTEXITCODE
+        }
+      shell: powershell
+    
+    - name: Configure CMake
+      run: |
+        $triplet = if ("${{ matrix.arch }}" -eq "Win32") { "x86-windows-static" } else { "x64-windows-static" }
+        $env:VCPKG_DEFAULT_TRIPLET = $triplet
+        cmake -S . -B build -G "Visual Studio 17 2022" -A ${{ matrix.arch }} -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}\vcpkg\scripts\buildsystems\vcpkg.cmake" -DVCPKG_TARGET_TRIPLET="$triplet"
+      shell: powershell
+    
+    - name: Build
+      run: |
+        cmake --build build --config ${{ matrix.config }} --parallel
+      shell: powershell
+    
+    - name: Package artifacts
+      run: |
+        $archName = if ("${{ matrix.arch }}" -eq "Win32") { "x86" } else { "x64" }
+        $packageName = "neufox-2fa-windows-$archName-${{ needs.prepare-version.outputs.build_version }}"
+        
+        # Create folder structure
+        New-Item -ItemType Directory -Path "$packageName\components" -Force | Out-Null
+        New-Item -ItemType Directory -Path "$packageName\include" -Force | Out-Null
+        
+        Write-Host "Build output files:"
+        Get-ChildItem "build\${{ matrix.config }}" -File
+        
+        Write-Host "`nCopying artifacts..."
+        # Copy DLL and PDB to components folder
+        Copy-Item "build\${{ matrix.config }}\neufox-2fa-*.dll" -Destination "$packageName\components\" -Verbose
+        Copy-Item "build\${{ matrix.config }}\neufox-2fa-*.pdb" -Destination "$packageName\components\" -Verbose
+        
+        # Copy include file
+        Copy-Item "include\neufox-2fa.inc" -Destination "$packageName\include\" -Verbose
+        
+        Write-Host "`nPackage structure:"
+        Get-ChildItem $packageName -Recurse
+        
+        # Create zip
+        Compress-Archive -Path "$packageName\*" -DestinationPath "$packageName.zip" -Force
+        
+        # Move to artifacts folder
+        New-Item -ItemType Directory -Path artifacts -Force | Out-Null
+        Move-Item "$packageName.zip" -Destination artifacts\ -Verbose
+      shell: powershell
+    
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: neufox-2fa-windows-${{ matrix.arch }}
+        path: artifacts/*.zip
+
+  build-linux:
+    name: Build Linux
+    needs: prepare-version
+    runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        arch: [x86, x64]
+        ssl: [static, dynssl]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y git cmake build-essential libssl-dev ninja-build
+        if [ "${{ matrix.arch }}" = "x86" ]; then
+          sudo dpkg --add-architecture i386
+          sudo apt-get update
+          sudo apt-get install -y gcc-multilib g++-multilib libssl-dev:i386
+        fi
+    
+    - name: Configure CMake
+      run: |
+        SHARED_SSL=${{ matrix.ssl == 'dynssl' && '1' || '0' }}
+        CFLAGS="${{ matrix.arch == 'x86' && '-m32' || '-m64' }}"
+        CXXFLAGS="${{ matrix.arch == 'x86' && '-m32' || '-m64' }}"
+        cmake -S . -B build \
+          -G Ninja \
+          -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+          -DCMAKE_C_FLAGS="$CFLAGS" \
+          -DCMAKE_CXX_FLAGS="$CXXFLAGS" \
+          -DSHARED_OPENSSL=$SHARED_SSL \
+          -DSTATIC_STDCXX=ON
+    
+    - name: Build
+      run: |
+        cmake --build build --parallel
+    
+    - name: Package artifacts
+      run: |
+        PACKAGE_NAME="neufox-2fa-linux-${{ matrix.arch }}-${{ matrix.ssl }}-${{ needs.prepare-version.outputs.build_version }}"
+        
+        # Create folder structure
+        mkdir -p "$PACKAGE_NAME/components"
+        mkdir -p "$PACKAGE_NAME/include"
+        
+        echo "Build output files:"
+        ls -lh build/
+        
+        echo -e "\nCopying artifacts..."
+        # Copy .so to components folder
+        find build -name "*.so" -exec cp -v {} "$PACKAGE_NAME/components/" \;
+        
+        # Copy include file
+        cp -v include/neufox-2fa.inc "$PACKAGE_NAME/include/"
+        
+        echo -e "\nPackage structure:"
+        tree "$PACKAGE_NAME" || find "$PACKAGE_NAME" -type f
+        
+        # Create tar.gz
+        tar -czf "$PACKAGE_NAME.tar.gz" -C "$PACKAGE_NAME" .
+        
+        # Move to artifacts folder
+        mkdir -p artifacts
+        mv -v "$PACKAGE_NAME.tar.gz" artifacts/
+    
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: neufox-2fa-linux-${{ matrix.arch }}-${{ matrix.ssl }}
+        path: artifacts/*.tar.gz
+
+  create-release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    needs: [prepare-version, build-windows, build-linux]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      
+      - name: Prepare release files
+        run: |
+          mkdir -p release-files
+          find artifacts -name "*.zip" -exec cp {} release-files/ \;
+          find artifacts -name "*.tar.gz" -exec cp {} release-files/ \;
+          echo "Release files:"
+          ls -lh release-files/
+        
+      - name: Create Release
+        id: create_release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ needs.prepare-version.outputs.tag_name }}" \
+            --title "${{ needs.prepare-version.outputs.release_name }}" \
+            --notes "### neufox's 2FA Component - TOTP Two-Factor Authentication
+          
+          **Installation:**
+          1. Download the package for your platform:
+             - Windows: \`neufox-2fa-windows-{x86|x64}-${{ needs.prepare-version.outputs.build_version }}.zip\`
+             - Linux: \`neufox-2fa-linux-{x86|x64}-{static|dynssl}-${{ needs.prepare-version.outputs.build_version }}.tar.gz\`
+          2. Extract the archive into your server directory
+          3. The \`components/\` folder contains the component library
+          4. The \`include/\` folder contains the Pawn include file
+          
+          **Features:**
+          - Time-based One-Time Password (TOTP) authentication
+          - Compatible with Google Authenticator, Authy, and other authenticator apps
+          - Failed attempt tracking with cooldown system
+          - Easy integration with existing authentication systems
+          - OpenSSL static linking on Windows (no extra DLLs needed)
+          
+          **Linux Variants:**
+          - \`static\`: Statically linked OpenSSL (recommended, no dependencies)
+          - \`dynssl\`: Dynamically linked OpenSSL (requires libssl on server)
+          
+          ${{ needs.prepare-version.outputs.is_prerelease == 'true' && '### Pre-release
+          This is a pre-release for testing and feedback. Please report any issues!' || '### Stable Release
+          This is an official stable release.' }}
+          
+          **Wiki:** https://github.com/${{ github.repository }}/wiki  
+          **Issues & Feedback:** https://github.com/${{ github.repository }}/issues" \
+            ${{ needs.prepare-version.outputs.is_prerelease == 'true' && '--prerelease' || '' }} \
+            release-files/*
+

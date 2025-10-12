@@ -1,10 +1,8 @@
-name: Build and Release
+name: Build CI
 
 on:
   push:
     branches: [ master, main ]
-    tags:
-      - 'v*'
   pull_request:
     branches: [ master, main ]
 
@@ -58,22 +56,40 @@ jobs:
     
     - name: Package artifacts
       run: |
-        New-Item -ItemType Directory -Path artifacts -Force | Out-Null
+        $archName = if ("${{ matrix.arch }}" -eq "Win32") { "x86" } else { "x64" }
+        $packageName = "neufox-2fa-windows-$archName"
+        
+        # Create folder structure
+        New-Item -ItemType Directory -Path "$packageName\components" -Force | Out-Null
+        New-Item -ItemType Directory -Path "$packageName\include" -Force | Out-Null
+        
         Write-Host "Build output files:"
         Get-ChildItem "build\${{ matrix.config }}" -File
+        
         Write-Host "`nCopying artifacts..."
-        # Only copy our component DLL and PDB (OpenSSL is statically linked)
-        Get-ChildItem "build\${{ matrix.config }}\neufox-2fa-*.dll" | Copy-Item -Destination artifacts\ -Verbose
-        Get-ChildItem "build\${{ matrix.config }}\neufox-2fa-*.pdb" | Copy-Item -Destination artifacts\ -Verbose
-        Write-Host "`nArtifacts directory:"
-        Get-ChildItem artifacts\
+        # Copy DLL and PDB to components folder
+        Copy-Item "build\${{ matrix.config }}\neufox-2fa-*.dll" -Destination "$packageName\components\" -Verbose
+        Copy-Item "build\${{ matrix.config }}\neufox-2fa-*.pdb" -Destination "$packageName\components\" -Verbose
+        
+        # Copy include file
+        Copy-Item "include\neufox-2fa.inc" -Destination "$packageName\include\" -Verbose
+        
+        Write-Host "`nPackage structure:"
+        Get-ChildItem $packageName -Recurse
+        
+        # Create zip
+        Compress-Archive -Path "$packageName\*" -DestinationPath "$packageName.zip" -Force
+        
+        # Move to artifacts folder
+        New-Item -ItemType Directory -Path artifacts -Force | Out-Null
+        Move-Item "$packageName.zip" -Destination artifacts\ -Verbose
       shell: powershell
     
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: neufox-2fa-windows-${{ matrix.arch }}-${{ matrix.config }}
-        path: artifacts/*
+        name: neufox-2fa-windows-${{ matrix.arch }}
+        path: artifacts/*.zip
 
   build-linux:
     runs-on: ubuntu-22.04
@@ -117,37 +133,34 @@ jobs:
     
     - name: Package artifacts
       run: |
-        mkdir -p artifacts
+        PACKAGE_NAME="neufox-2fa-linux-${{ matrix.arch }}-${{ matrix.ssl }}"
+        
+        # Create folder structure
+        mkdir -p "$PACKAGE_NAME/components"
+        mkdir -p "$PACKAGE_NAME/include"
+        
         echo "Build output files:"
         ls -lh build/
+        
         echo -e "\nCopying artifacts..."
-        find build -name "*.so" -exec cp -v {} artifacts/ \;
-        echo -e "\nArtifacts directory:"
-        ls -lh artifacts/
+        # Copy .so to components folder
+        find build -name "*.so" -exec cp -v {} "$PACKAGE_NAME/components/" \;
+        
+        # Copy include file
+        cp -v include/neufox-2fa.inc "$PACKAGE_NAME/include/"
+        
+        echo -e "\nPackage structure:"
+        tree "$PACKAGE_NAME" || find "$PACKAGE_NAME" -type f
+        
+        # Create tar.gz
+        tar -czf "$PACKAGE_NAME.tar.gz" -C "$PACKAGE_NAME" .
+        
+        # Move to artifacts folder
+        mkdir -p artifacts
+        mv -v "$PACKAGE_NAME.tar.gz" artifacts/
     
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
         name: neufox-2fa-linux-${{ matrix.arch }}-${{ matrix.ssl }}
-        path: artifacts/*
-
-  release:
-    needs: [build-windows, build-linux]
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
-    
-    steps:
-    - name: Download all artifacts
-      uses: actions/download-artifact@v4
-      with:
-        path: artifacts
-    
-    - name: Create Release
-      uses: softprops/action-gh-release@v1
-      with:
-        files: artifacts/**/*
-        draft: false
-        prerelease: false
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
+        path: artifacts/*.tar.gz
