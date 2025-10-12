@@ -23,36 +23,36 @@ jobs:
         submodules: recursive
     
     - name: Setup vcpkg
-      uses: lukka/run-vcpkg@v11
-      with:
-        vcpkgGitCommitId: 'latest'
+      run: |
+        git clone https://github.com/Microsoft/vcpkg.git
+        cd vcpkg
+        .\bootstrap-vcpkg.bat
+      shell: cmd
     
     - name: Install dependencies
       run: |
-        vcpkg install glm:${{ matrix.arch }}-windows
-        vcpkg install robin-hood-hashing:${{ matrix.arch }}-windows
-        vcpkg install span-lite:${{ matrix.arch }}-windows
-        vcpkg install string-view-lite:${{ matrix.arch }}-windows
-        vcpkg install openssl:${{ matrix.arch }}-windows
+        $triplet = if ("${{ matrix.arch }}" -eq "Win32") { "x86-windows" } else { "x64-windows" }
+        .\vcpkg\vcpkg.exe install glm:$triplet robin-hood-hashing:$triplet span-lite:$triplet string-view-lite:$triplet openssl:$triplet
+      shell: powershell
     
     - name: Configure CMake
       run: |
-        mkdir build
-        cd build
-        cmake .. -G "Visual Studio 17 2022" -A ${{ matrix.arch }} -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
+        cmake -S . -B build -G "Visual Studio 17 2022" -A ${{ matrix.arch }} -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}\vcpkg\scripts\buildsystems\vcpkg.cmake"
+      shell: powershell
     
     - name: Build
       run: |
-        cd build
-        cmake --build . --config ${{ matrix.config }}
+        cmake --build build --config ${{ matrix.config }} --parallel
+      shell: powershell
     
     - name: Package artifacts
       run: |
-        $arch = "${{ matrix.arch }}" -replace "Win32", "x86"
-        mkdir artifacts
-        Copy-Item "build/${{ matrix.config }}/neufox-2fa-*.dll" artifacts/
-        Copy-Item "build/${{ matrix.config }}/neufox-2fa-*.pdb" artifacts/
-        Copy-Item "build/${{ matrix.config }}/libcrypto-*.dll" artifacts/
+        New-Item -ItemType Directory -Path artifacts -Force | Out-Null
+        Copy-Item "build\${{ matrix.config }}\neufox-2fa-*.dll" artifacts\ -ErrorAction SilentlyContinue
+        Copy-Item "build\${{ matrix.config }}\neufox-2fa-*.pdb" artifacts\ -ErrorAction SilentlyContinue
+        Copy-Item "build\${{ matrix.config }}\libcrypto-*.dll" artifacts\ -ErrorAction SilentlyContinue
+        Get-ChildItem artifacts\
+      shell: powershell
     
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
@@ -61,45 +61,55 @@ jobs:
         path: artifacts/*
 
   build-linux:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     strategy:
       matrix:
-        container: ['ubuntu:20.04', 'ubuntu:22.04']
-    
-    container: ${{ matrix.container }}
+        arch: [x86, x64]
+        ssl: [static, dynssl]
     
     steps:
-    - name: Install dependencies
-      run: |
-        apt-get update
-        apt-get install -y git cmake build-essential libssl-dev
-    
     - name: Checkout code
       uses: actions/checkout@v4
       with:
         submodules: recursive
     
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y git cmake build-essential libssl-dev ninja-build
+        if [ "${{ matrix.arch }}" = "x86" ]; then
+          sudo dpkg --add-architecture i386
+          sudo apt-get update
+          sudo apt-get install -y gcc-multilib g++-multilib libssl-dev:i386
+        fi
+    
     - name: Configure CMake
       run: |
-        mkdir build
-        cd build
-        cmake .. -DCMAKE_BUILD_TYPE=RelWithDebInfo
+        SHARED_SSL=${{ matrix.ssl == 'dynssl' && '1' || '0' }}
+        CFLAGS="${{ matrix.arch == 'x86' && '-m32' || '-m64' }}"
+        CXXFLAGS="${{ matrix.arch == 'x86' && '-m32' || '-m64' }}"
+        cmake -S . -B build \
+          -G Ninja \
+          -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+          -DCMAKE_C_FLAGS="$CFLAGS" \
+          -DCMAKE_CXX_FLAGS="$CXXFLAGS" \
+          -DSHARED_OPENSSL=$SHARED_SSL \
+          -DSTATIC_STDCXX=ON
     
     - name: Build
       run: |
-        cd build
-        cmake --build .
+        cmake --build build --parallel
     
     - name: Package artifacts
       run: |
-        mkdir artifacts
+        mkdir -p artifacts
         cp build/neufox-2fa-*.so artifacts/ || true
-        cp build/libcrypto.so.3 artifacts/ || true
+        ls -lh artifacts/
     
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: neufox-2fa-${{ matrix.container }}-x64
+        name: neufox-2fa-linux-${{ matrix.arch }}-${{ matrix.ssl }}
         path: artifacts/*
 
   release:
