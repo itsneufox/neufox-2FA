@@ -1,4 +1,4 @@
-# neufox's 2FA - TOTP Two-Factor Authentication for open.mp
+# neufox's 2FA - Two-Factor Authentication for open.mp
 
 A secure TOTP (Time-based One-Time Password) two-factor authentication component for open.mp servers.
 
