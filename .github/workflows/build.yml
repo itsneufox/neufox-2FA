@@ -48,9 +48,12 @@ jobs:
     - name: Package artifacts
       run: |
         New-Item -ItemType Directory -Path artifacts -Force | Out-Null
-        Copy-Item "build\${{ matrix.config }}\neufox-2fa-*.dll" artifacts\ -ErrorAction SilentlyContinue
-        Copy-Item "build\${{ matrix.config }}\neufox-2fa-*.pdb" artifacts\ -ErrorAction SilentlyContinue
-        Copy-Item "build\${{ matrix.config }}\libcrypto-*.dll" artifacts\ -ErrorAction SilentlyContinue
+        Write-Host "Build output files:"
+        Get-ChildItem "build\${{ matrix.config }}" -File
+        Write-Host "`nCopying artifacts..."
+        Get-ChildItem "build\${{ matrix.config }}\*.dll" | Copy-Item -Destination artifacts\ -Verbose
+        Get-ChildItem "build\${{ matrix.config }}\*.pdb" | Copy-Item -Destination artifacts\ -Verbose
+        Write-Host "`nArtifacts directory:"
         Get-ChildItem artifacts\
       shell: powershell
     
@@ -103,7 +106,11 @@ jobs:
     - name: Package artifacts
       run: |
         mkdir -p artifacts
-        cp build/neufox-2fa-*.so artifacts/ || true
+        echo "Build output files:"
+        ls -lh build/
+        echo -e "\nCopying artifacts..."
+        find build -name "*.so" -exec cp -v {} artifacts/ \;
+        echo -e "\nArtifacts directory:"
         ls -lh artifacts/
     
     - name: Upload artifacts
