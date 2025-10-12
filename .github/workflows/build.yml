@@ -76,9 +76,9 @@ jobs:
         $vsPath = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
         $dumpbinPath = Join-Path $vsPath "VC\Tools\MSVC\*\bin\Hostx64\x64\dumpbin.exe" | Get-Item | Select-Object -First 1 -ExpandProperty FullName
 
-        $exports = & $dumpbinPath /exports $dllPath
+        $exports = & $dumpbinPath /exports $dllPath | Out-String
         Write-Host "`nExported symbols:"
-        $exports | Select-String "ComponentEntryPoint"
+        Write-Host ($exports | Select-String "ComponentEntryPoint")
 
         if ($exports -notmatch "ComponentEntryPoint") {
           Write-Error "CRITICAL: ComponentEntryPoint symbol not found! ABI is broken."
