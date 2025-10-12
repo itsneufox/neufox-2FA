@@ -103,3 +103,40 @@ if(WIN32)
     )
 endif()
 
+# Installation rules
+install(TARGETS ${PROJECT_NAME}
+    RUNTIME DESTINATION .
+    LIBRARY DESTINATION .
+    COMPONENT runtime
+    EXCLUDE_FROM_ALL
+)
+
+# Install PDB files separately on Windows
+if(WIN32)
+    install(FILES "$<TARGET_FILE_DIR:${PROJECT_NAME}>/${OUTPUT_NAME}.pdb"
+        DESTINATION .
+        COMPONENT debug
+        EXCLUDE_FROM_ALL
+        OPTIONAL
+    )
+endif()
+
+# CPack configuration for packaging
+set(CPACK_GENERATOR "ZIP")
+set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
+set(CPACK_INCLUDE_TOPLEVEL_DIRECTORY OFF)
+
+# Separate packages per component
+set(CPACK_COMPONENTS_ALL_IN_ONE_PACKAGE 0)
+set(CPACK_ARCHIVE_COMPONENT_INSTALL ON)
+
+# Configure runtime package (DLL/SO only)
+set(CPACK_ARCHIVE_RUNTIME_FILE_NAME "${OUTPUT_NAME}")
+
+# Configure debug package (PDB files only)
+if(WIN32)
+    set(CPACK_ARCHIVE_DEBUG_FILE_NAME "${OUTPUT_NAME}-debug")
+endif()
+
+include(CPack)
+
