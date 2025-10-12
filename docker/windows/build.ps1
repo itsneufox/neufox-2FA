@@ -134,13 +134,26 @@ if ($UseDocker) {
         Write-Error "Build failed"
         exit 1
     }
+    
+    # Install
+    Write-Host ""
+    Write-Host "Installing..." -ForegroundColor Green
+    
+    & cmake `
+        --install "$projectRoot\$outputDir" `
+        --config $Config
+    
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "Install failed"
+        exit 1
+    }
 }
 
 # Package the build
 $outputDir = "build-windows-$Arch"
 $releasesDir = "$projectRoot\releases"
 
-if (Test-Path "$projectRoot\$outputDir\$Config") {
+if (Test-Path "$projectRoot\$outputDir") {
     Write-Host ""
     Write-Host "Packaging build with CPack..." -ForegroundColor Green
     

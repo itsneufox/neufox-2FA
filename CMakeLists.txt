@@ -108,7 +108,6 @@ install(TARGETS ${PROJECT_NAME}
     RUNTIME DESTINATION .
     LIBRARY DESTINATION .
     COMPONENT runtime
-    EXCLUDE_FROM_ALL
 )
 
 # Install PDB files separately on Windows
@@ -116,7 +115,6 @@ if(WIN32)
     install(FILES "$<TARGET_FILE_DIR:${PROJECT_NAME}>/${OUTPUT_NAME}.pdb"
         DESTINATION .
         COMPONENT debug
-        EXCLUDE_FROM_ALL
         OPTIONAL
     )
 endif()
@@ -129,6 +127,13 @@ set(CPACK_INCLUDE_TOPLEVEL_DIRECTORY OFF)
 # Separate packages per component
 set(CPACK_COMPONENTS_ALL_IN_ONE_PACKAGE 0)
 set(CPACK_ARCHIVE_COMPONENT_INSTALL ON)
+
+# Define components
+if(WIN32)
+    set(CPACK_COMPONENTS_ALL runtime debug)
+else()
+    set(CPACK_COMPONENTS_ALL runtime)
+endif()
 
 # Configure runtime package (DLL/SO only)
 set(CPACK_ARCHIVE_RUNTIME_FILE_NAME "${OUTPUT_NAME}")

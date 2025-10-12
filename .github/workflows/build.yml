@@ -54,6 +54,11 @@ jobs:
         cmake --build build --config ${{ matrix.config }} --parallel
       shell: powershell
     
+    - name: Install
+      run: |
+        cmake --install build --config ${{ matrix.config }}
+      shell: powershell
+    
     - name: Package with CPack
       run: |
         cd build

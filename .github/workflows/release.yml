@@ -136,6 +136,11 @@ jobs:
         cmake --build build --config ${{ matrix.config }} --parallel
       shell: powershell
     
+    - name: Install
+      run: |
+        cmake --install build --config ${{ matrix.config }}
+      shell: powershell
+    
     - name: Package with CPack
       run: |
         cd build
@@ -381,13 +386,28 @@ jobs:
       
       - name: Prepare debug release files
         run: |
+          echo "Searching for debug packages..."
+          echo "All artifacts:"
+          find artifacts -type f
+          
+          echo ""
+          echo "Debug packages:"
+          find artifacts -name "*-debug-*.zip"
+          
           mkdir -p debug-files
           # Copy debug packages only
           find artifacts -name "*-debug-*.zip" -exec cp {} debug-files/ \;
           find artifacts -name "*-debug-*.sha256" -exec cp {} debug-files/ \;
           
-          echo "Debug symbol files:"
-          ls -lh debug-files/
+          echo ""
+          echo "Debug symbol files to release:"
+          ls -lh debug-files/ || echo "No debug files found!"
+          
+          # Check if debug-files directory has any files
+          if [ -z "$(ls -A debug-files 2>/dev/null)" ]; then
+            echo "ERROR: No debug files found to release"
+            exit 1
+          fi
         
       - name: Create Debug Release
         env:
