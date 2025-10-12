@@ -140,43 +140,26 @@ jobs:
       run: |
         cmake --install build --config ${{ matrix.config }}
       shell: powershell
-    
+
     - name: Package with CPack
       run: |
         cd build
         cpack -G ZIP -C ${{ matrix.config }}
-        Write-Host "`nGenerated packages:"
-        Get-ChildItem *.zip
       shell: powershell
-    
+
     - name: Organize packages
       run: |
         $archName = if ("${{ matrix.arch }}" -eq "Win32") { "x86" } else { "x64" }
         $version = "${{ needs.prepare-version.outputs.build_version }}"
-        
-        # Create artifacts directory
+
         New-Item -ItemType Directory -Path artifacts -Force | Out-Null
-        
-        # Find and rename packages with version
+
         Get-ChildItem build\*.zip | ForEach-Object {
-          # Add version suffix
           $newName = $_.Name -replace '\.zip$', "-$version.zip"
-          
-          Write-Host "Package: $newName"
           Copy-Item $_.FullName -Destination "artifacts\$newName"
-          
-          # Generate SHA256
+
           $hash = Get-FileHash -Path "artifacts\$newName" -Algorithm SHA256
           $hash.Hash.ToLower() | Out-File -FilePath "artifacts\$newName.sha256" -Encoding ASCII
-        }
-        
-        Write-Host "`nPackage contents:"
-        Get-ChildItem artifacts\*.zip | ForEach-Object {
-          Write-Host "`n$($_.Name):"
-          Add-Type -AssemblyName System.IO.Compression.FileSystem
-          $zip = [System.IO.Compression.ZipFile]::OpenRead($_.FullName)
-          $zip.Entries | ForEach-Object { Write-Host "  - $($_.Name)" }
-          $zip.Dispose()
         }
       shell: powershell
     
@@ -235,34 +218,21 @@ jobs:
     - name: Build
       run: |
         cmake --build build --parallel
-    
+
     - name: Package artifacts
       run: |
         PACKAGE_NAME="neufox-2fa-linux-${{ matrix.arch }}-${{ matrix.ssl }}-${{ needs.prepare-version.outputs.build_version }}"
-        
-        # Create folder structure
+
         mkdir -p "$PACKAGE_NAME/components"
         mkdir -p "$PACKAGE_NAME/include"
-        
-        echo "Build output files:"
-        ls -lh build/
-        
-        echo -e "\nCopying artifacts..."
-        # Copy .so to components folder
-        find build -name "*.so" -exec cp -v {} "$PACKAGE_NAME/components/" \;
-        
-        # Copy include file
-        cp -v include/neufox-2fa.inc "$PACKAGE_NAME/include/"
-        
-        echo -e "\nPackage structure:"
-        tree "$PACKAGE_NAME" || find "$PACKAGE_NAME" -type f
-        
-        # Create tar.gz
+
+        find build -name "*.so" -exec cp {} "$PACKAGE_NAME/components/" \;
+        cp include/neufox-2fa.inc "$PACKAGE_NAME/include/"
+
         tar -czf "$PACKAGE_NAME.tar.gz" -C "$PACKAGE_NAME" .
-        
-        # Move to artifacts folder
+
         mkdir -p artifacts
-        mv -v "$PACKAGE_NAME.tar.gz" artifacts/
+        mv "$PACKAGE_NAME.tar.gz" artifacts/
     
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
@@ -320,14 +290,9 @@ jobs:
       - name: Prepare runtime release files
         run: |
           mkdir -p release-files
-          # Copy runtime packages only (exclude debug)
           find artifacts -name "*.zip" ! -name "*-debug-*" -exec cp {} release-files/ \;
           find artifacts -name "*.tar.gz" -exec cp {} release-files/ \;
-          # Copy corresponding SHA256 files
           find artifacts -name "*.sha256" ! -name "*-debug-*" -exec cp {} release-files/ \;
-          
-          echo "Runtime release files:"
-          ls -lh release-files/
         
       - name: Create Main Release
         env:
@@ -390,24 +355,10 @@ jobs:
       
       - name: Prepare debug release files
         run: |
-          echo "Searching for debug packages..."
-          echo "All artifacts:"
-          find artifacts -type f
-          
-          echo ""
-          echo "Debug packages:"
-          find artifacts -name "*-debug-*.zip"
-          
           mkdir -p debug-files
-          # Copy debug packages only
           find artifacts -name "*-debug-*.zip" -exec cp {} debug-files/ \;
           find artifacts -name "*-debug-*.sha256" -exec cp {} debug-files/ \;
-          
-          echo ""
-          echo "Debug symbol files to release:"
-          ls -lh debug-files/ || echo "No debug files found!"
-          
-          # Check if debug-files directory has any files
+
           if [ -z "$(ls -A debug-files 2>/dev/null)" ]; then
             echo "ERROR: No debug files found to release"
             exit 1

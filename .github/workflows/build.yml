@@ -58,7 +58,32 @@ jobs:
       run: |
         cmake --install build --config ${{ matrix.config }}
       shell: powershell
-    
+
+    - name: Check ABI compatibility
+      run: |
+        Write-Host "=== ABI Compatibility Check ==="
+
+        $dllPath = Get-ChildItem -Recurse -Filter "neufox-2fa-*.dll" | Select-Object -First 1 -ExpandProperty FullName
+
+        if (-not $dllPath) {
+          Write-Error "DLL not found for ABI check"
+          exit 1
+        }
+
+        Write-Host "Checking DLL: $dllPath"
+
+        $exports = dumpbin /exports $dllPath
+        Write-Host "`nExported symbols:"
+        $exports | Select-String "ComponentEntryPoint"
+
+        if ($exports -notmatch "ComponentEntryPoint") {
+          Write-Error "CRITICAL: ComponentEntryPoint symbol not found! ABI is broken."
+          exit 1
+        }
+
+        Write-Host "`n✓ ABI check passed: ComponentEntryPoint is correctly exported"
+      shell: powershell
+
     - name: Package with CPack
       run: |
         cd build
@@ -154,7 +179,30 @@ jobs:
     - name: Build
       run: |
         cmake --build build --parallel
-    
+
+    - name: Check ABI compatibility
+      run: |
+        echo "=== ABI Compatibility Check ==="
+
+        SO_FILE=$(find build -name "*.so" -type f | head -n 1)
+
+        if [ -z "$SO_FILE" ]; then
+          echo "ERROR: .so file not found for ABI check"
+          exit 1
+        fi
+
+        echo "Checking SO file: $SO_FILE"
+
+        echo -e "\nExported symbols:"
+        nm -D "$SO_FILE" | grep -E "ComponentEntryPoint|T "
+
+        if ! nm -D "$SO_FILE" | grep -q "ComponentEntryPoint"; then
+          echo "CRITICAL: ComponentEntryPoint symbol not found! ABI is broken."
+          exit 1
+        fi
+
+        echo -e "\n✓ ABI check passed: ComponentEntryPoint is correctly exported"
+
     - name: Package artifacts
       run: |
         PACKAGE_NAME="neufox-2fa-linux-${{ matrix.arch }}-${{ matrix.ssl }}"
