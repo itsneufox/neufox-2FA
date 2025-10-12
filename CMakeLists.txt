@@ -46,22 +46,20 @@ else()
     set(SSL_SUFFIX "static")
 endif()
 
-# Set output name: neufox-2fa-{arch}-{ssl} for Linux, neufox-2fa-{arch} for Windows
 if(WIN32)
-    set(OUTPUT_NAME "neufox-2fa-${ARCH_NAME}")
+    set(PLATFORM_NAME "win")
+    set(OUTPUT_NAME "neufox-2fa-${PLATFORM_NAME}-${ARCH_NAME}")
 else()
-    set(OUTPUT_NAME "neufox-2fa-${ARCH_NAME}-${SSL_SUFFIX}")
+    set(PLATFORM_NAME "linux")
+    set(OUTPUT_NAME "neufox-2fa-${PLATFORM_NAME}-${ARCH_NAME}-${SSL_SUFFIX}")
 endif()
 
-set_target_properties(${PROJECT_NAME} PROPERTIES 
+set_target_properties(${PROJECT_NAME} PROPERTIES
     OUTPUT_NAME "${OUTPUT_NAME}"
-    PREFIX ""  # Remove 'lib' prefix on Linux
+    PREFIX ""
 )
 
 message(STATUS "Building ${OUTPUT_NAME} for ${CMAKE_SYSTEM_NAME} ${ARCH_NAME}")
-
-# Find OpenSSL package
-# For 32-bit builds on Linux, use pkg-config to find the correct multiarch libraries
 if(UNIX AND NOT WIN32 AND ARCH_NAME STREQUAL "x86")
     find_package(PkgConfig REQUIRED)
     set(ENV{PKG_CONFIG_PATH} "/usr/lib/i386-linux-gnu/pkgconfig")
@@ -71,8 +69,6 @@ if(UNIX AND NOT WIN32 AND ARCH_NAME STREQUAL "x86")
     message(STATUS "  Include dirs: ${OPENSSL_INCLUDE_DIRS}")
     message(STATUS "  Library dirs: ${OPENSSL_LIBRARY_DIRS}")
     message(STATUS "  Libraries: ${OPENSSL_LIBRARIES}")
-    
-    # Link using pkg-config variables directly
     target_include_directories(${PROJECT_NAME} PRIVATE ${OPENSSL_INCLUDE_DIRS})
     target_link_directories(${PROJECT_NAME} PRIVATE ${OPENSSL_LIBRARY_DIRS})
     target_link_libraries(${PROJECT_NAME} PRIVATE
@@ -81,36 +77,26 @@ if(UNIX AND NOT WIN32 AND ARCH_NAME STREQUAL "x86")
     )
 else()
     find_package(OpenSSL REQUIRED)
-    
-    # Link libraries
     target_link_libraries(${PROJECT_NAME} PRIVATE
         OMP-SDK
         OpenSSL::Crypto
     )
 endif()
-
-# Static linking configuration
 option(STATIC_STDCXX "Statically link libstdc++" OFF)
 if(STATIC_STDCXX AND NOT WIN32)
     target_link_options(${PROJECT_NAME} PRIVATE -static-libgcc -static-libstdc++)
 endif()
-
-# Windows-specific configuration
 if(WIN32)
     set_target_properties(${PROJECT_NAME} PROPERTIES
         COMPILE_PDB_NAME "${OUTPUT_NAME}"
         COMPILE_PDB_OUTPUT_DIRECTORY "$<TARGET_FILE_DIR:${PROJECT_NAME}>"
     )
 endif()
-
-# Installation rules
 install(TARGETS ${PROJECT_NAME}
     RUNTIME DESTINATION .
     LIBRARY DESTINATION .
     COMPONENT runtime
 )
-
-# Install PDB files separately on Windows
 if(WIN32)
     install(FILES "$<TARGET_FILE_DIR:${PROJECT_NAME}>/${OUTPUT_NAME}.pdb"
         DESTINATION .
@@ -118,27 +104,20 @@ if(WIN32)
         OPTIONAL
     )
 endif()
-
-# CPack configuration for packaging
 set(CPACK_GENERATOR "ZIP")
 set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
 set(CPACK_INCLUDE_TOPLEVEL_DIRECTORY OFF)
-
-# Separate packages per component
+set(CPACK_SYSTEM_NAME "")
+set(CPACK_PACKAGE_FILE_NAME "${OUTPUT_NAME}")
 set(CPACK_COMPONENTS_ALL_IN_ONE_PACKAGE 0)
 set(CPACK_ARCHIVE_COMPONENT_INSTALL ON)
-
-# Define components
 if(WIN32)
     set(CPACK_COMPONENTS_ALL runtime debug)
 else()
     set(CPACK_COMPONENTS_ALL runtime)
 endif()
 
-# Configure runtime package (DLL/SO only)
 set(CPACK_ARCHIVE_RUNTIME_FILE_NAME "${OUTPUT_NAME}")
-
-# Configure debug package (PDB files only)
 if(WIN32)
     set(CPACK_ARCHIVE_DEBUG_FILE_NAME "${OUTPUT_NAME}-debug")
 endif()
