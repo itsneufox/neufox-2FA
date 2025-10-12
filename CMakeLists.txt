@@ -58,13 +58,33 @@ set_target_properties(${PROJECT_NAME} PROPERTIES OUTPUT_NAME "${OUTPUT_NAME}")
 message(STATUS "Building ${OUTPUT_NAME} for ${CMAKE_SYSTEM_NAME} ${ARCH_NAME}")
 
 # Find OpenSSL package
-find_package(OpenSSL REQUIRED)
-
-# Link libraries
-target_link_libraries(${PROJECT_NAME} PRIVATE
-    OMP-SDK
-    OpenSSL::Crypto
-)
+# For 32-bit builds on Linux, use pkg-config to find the correct multiarch libraries
+if(UNIX AND NOT WIN32 AND ARCH_NAME STREQUAL "x86")
+    find_package(PkgConfig REQUIRED)
+    set(ENV{PKG_CONFIG_PATH} "/usr/lib/i386-linux-gnu/pkgconfig")
+    pkg_search_module(OPENSSL REQUIRED openssl libcrypto)
+    
+    message(STATUS "32-bit OpenSSL found:")
+    message(STATUS "  Include dirs: ${OPENSSL_INCLUDE_DIRS}")
+    message(STATUS "  Library dirs: ${OPENSSL_LIBRARY_DIRS}")
+    message(STATUS "  Libraries: ${OPENSSL_LIBRARIES}")
+    
+    # Link using pkg-config variables directly
+    target_include_directories(${PROJECT_NAME} PRIVATE ${OPENSSL_INCLUDE_DIRS})
+    target_link_directories(${PROJECT_NAME} PRIVATE ${OPENSSL_LIBRARY_DIRS})
+    target_link_libraries(${PROJECT_NAME} PRIVATE
+        OMP-SDK
+        ${OPENSSL_LIBRARIES}
+    )
+else()
+    find_package(OpenSSL REQUIRED)
+    
+    # Link libraries
+    target_link_libraries(${PROJECT_NAME} PRIVATE
+        OMP-SDK
+        OpenSSL::Crypto
+    )
+endif()
 
 # Static linking configuration
 option(STATIC_STDCXX "Statically link libstdc++" OFF)
