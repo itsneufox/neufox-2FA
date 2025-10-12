@@ -35,12 +35,6 @@ bool TOTPComponent::generateSecret(IPlayer& player, char* output)
 
 	TOTPUtils::generateSecret(output, TOTP_SECRET_LENGTH + 1);
 
-	// Debug log
-	if (core_)
-	{
-		core_->printLn("Generated TOTP secret: %s", output);
-	}
-
 	return true;
 }
 
