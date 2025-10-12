@@ -138,45 +138,69 @@ if ($UseDocker) {
 
 # Package the build
 $outputDir = "build-windows-$Arch"
-$outputName = "neufox-2fa-windows-${Arch}-${Version}"
 $releasesDir = "$projectRoot\releases"
 
 if (Test-Path "$projectRoot\$outputDir\$Config") {
     Write-Host ""
-    Write-Host "Packaging build..." -ForegroundColor Green
+    Write-Host "Packaging build with CPack..." -ForegroundColor Green
     
     # Create releases directory
     if (-not (Test-Path $releasesDir)) {
         New-Item -ItemType Directory -Path $releasesDir | Out-Null
     }
     
-    # Create zip archive
-    $zipPath = "$releasesDir\${outputName}.zip"
-    Compress-Archive `
-        -Path "$projectRoot\$outputDir\$Config\*" `
-        -DestinationPath $zipPath `
-        -Force
+    # Use CPack to create packages (runtime and debug separately)
+    Push-Location "$projectRoot\$outputDir"
     
-    # Calculate SHA256
-    $hash = Get-FileHash -Path $zipPath -Algorithm SHA256
-    $hash.Hash.ToLower() | Out-File -FilePath "$zipPath.sha256" -Encoding ASCII
+    & cpack -G ZIP -C $Config
+    
+    if ($LASTEXITCODE -ne 0) {
+        Pop-Location
+        Write-Error "CPack packaging failed"
+        exit 1
+    }
+    
+    Pop-Location
+    
+    # Move packages to releases directory with version suffix
+    $packages = Get-ChildItem "$projectRoot\$outputDir" -Filter "*.zip"
     
     Write-Host ""
     Write-Host "========================================" -ForegroundColor Cyan
     Write-Host "Build completed successfully!" -ForegroundColor Green
     Write-Host "========================================" -ForegroundColor Cyan
-    Write-Host "Output: releases\${outputName}.zip" -ForegroundColor Yellow
-    Write-Host "SHA256: releases\${outputName}.zip.sha256" -ForegroundColor Yellow
     
-    # Show file size
-    $zipFile = Get-Item $zipPath
-    Write-Host "Size: $([math]::Round($zipFile.Length / 1MB, 2)) MB" -ForegroundColor Yellow
+    foreach ($package in $packages) {
+        # Add version to filename
+        $newName = $package.Name -replace '\.zip$', "-${Version}.zip"
+        $destPath = Join-Path $releasesDir $newName
+        
+        Copy-Item $package.FullName -Destination $destPath -Force
+        
+        # Calculate SHA256
+        $hash = Get-FileHash -Path $destPath -Algorithm SHA256
+        $hash.Hash.ToLower() | Out-File -FilePath "$destPath.sha256" -Encoding ASCII
+        
+        # Show info
+        $sizeMB = [math]::Round((Get-Item $destPath).Length / 1MB, 2)
+        Write-Host "Package: releases\$newName" -ForegroundColor Yellow
+        Write-Host "  Size: $sizeMB MB" -ForegroundColor Gray
+        Write-Host "  SHA256: releases\$newName.sha256" -ForegroundColor Gray
+        Write-Host ""
+    }
     
-    # List contents
-    Write-Host ""
+    # List package contents
     Write-Host "Package contents:" -ForegroundColor Green
-    Get-ChildItem "$projectRoot\$outputDir\$Config" -File | ForEach-Object {
-        Write-Host "  - $($_.Name)" -ForegroundColor Gray
+    foreach ($package in $packages) {
+        $packageName = $package.Name -replace '\.zip$', "-${Version}.zip"
+        Write-Host "  $packageName" -ForegroundColor Cyan
+        Add-Type -AssemblyName System.IO.Compression.FileSystem
+        $zip = [System.IO.Compression.ZipFile]::OpenRead($package.FullName)
+        $zip.Entries | ForEach-Object {
+            Write-Host "    - $($_.Name)" -ForegroundColor Gray
+        }
+        $zip.Dispose()
+        Write-Host ""
     }
 } else {
     Write-Error "Build output directory not found: $projectRoot\$outputDir\$Config"
