@@ -81,7 +81,7 @@ jobs:
           exit 1
         }
 
-        Write-Host "`n✓ ABI check passed: ComponentEntryPoint is correctly exported"
+        Write-Host "`nABI check passed: ComponentEntryPoint is correctly exported"
       shell: powershell
 
     - name: Package with CPack
@@ -201,7 +201,7 @@ jobs:
           exit 1
         fi
 
-        echo -e "\n✓ ABI check passed: ComponentEntryPoint is correctly exported"
+        echo -e "\nABI check passed: ComponentEntryPoint is correctly exported"
 
     - name: Package artifacts
       run: |
