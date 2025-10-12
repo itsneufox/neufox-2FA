@@ -53,7 +53,10 @@ else()
     set(OUTPUT_NAME "neufox-2fa-${ARCH_NAME}-${SSL_SUFFIX}")
 endif()
 
-set_target_properties(${PROJECT_NAME} PROPERTIES OUTPUT_NAME "${OUTPUT_NAME}")
+set_target_properties(${PROJECT_NAME} PROPERTIES 
+    OUTPUT_NAME "${OUTPUT_NAME}"
+    PREFIX ""  # Remove 'lib' prefix on Linux
+)
 
 message(STATUS "Building ${OUTPUT_NAME} for ${CMAKE_SYSTEM_NAME} ${ARCH_NAME}")
 
