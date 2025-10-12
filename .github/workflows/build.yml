@@ -72,7 +72,11 @@ jobs:
 
         Write-Host "Checking DLL: $dllPath"
 
-        $exports = dumpbin /exports $dllPath
+        $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+        $vsPath = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+        $dumpbinPath = Join-Path $vsPath "VC\Tools\MSVC\*\bin\Hostx64\x64\dumpbin.exe" | Get-Item | Select-Object -First 1 -ExpandProperty FullName
+
+        $exports = & $dumpbinPath /exports $dllPath
         Write-Host "`nExported symbols:"
         $exports | Select-String "ComponentEntryPoint"
 
