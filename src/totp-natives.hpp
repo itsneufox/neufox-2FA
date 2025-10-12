@@ -9,7 +9,7 @@
  */
 
 // Include pawn-natives macros (`SCRIPT_API`) and lookups (`IPlayer&`).
-#include <Server/Components/Pawn/pawn_natives.hpp>
+#include <Server/Components/Pawn/Impl/pawn_natives.hpp>
 
 // To get the component.
 #include "totp-component.hpp"

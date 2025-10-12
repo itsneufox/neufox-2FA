@@ -8,6 +8,7 @@ add_subdirectory(network)
 
 include_directories(
 	src
+	sdk/include
 	pawn/source
 	pawn/source/linux
 	pawn-natives

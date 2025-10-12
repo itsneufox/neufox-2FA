@@ -7,10 +7,10 @@
  */
 
 // Include pawn-natives macros (`SCRIPT_API`) and lookups (`IPlayer&`).
-#include <Server/Components/Pawn/pawn_natives.hpp>
+#include <Server/Components/Pawn/Impl/pawn_natives.hpp>
 
 // Include a few function implementations.  Should only be included once.
-#include <Server/Components/Pawn/pawn_impl.hpp>
+#include <Server/Components/Pawn/Impl/pawn_impl.hpp>
 
 // Include Impl headers for DefaultEventDispatcher
 #include <Impl/events_impl.hpp>
