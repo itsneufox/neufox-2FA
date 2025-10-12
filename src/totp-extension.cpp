@@ -23,10 +23,7 @@ void TOTPExtension::setEnabled(bool enabled)
 {
 	enabled_ = enabled;
 	if (!enabled)
-	{
-		// Clear verification when disabling
 		verified_ = false;
-	}
 }
 
 void TOTPExtension::setVerified(bool verified)
@@ -88,7 +85,6 @@ void TOTPExtension::freeExtension()
 
 void TOTPExtension::reset()
 {
-	// Reset verification status on mode change, but keep TOTP enabled
 	verified_ = false;
 	failedAttempts_ = 0;
 	lastAttempt_ = TimePoint::min();

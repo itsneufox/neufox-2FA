@@ -13,12 +13,7 @@
 
 namespace TOTPUtils
 {
-	// Generate a random base32 secret (32 characters)
 	void generateSecret(char* output, size_t length);
-
-	// Verify a TOTP code against a secret
 	bool verifyTOTP(const char* secret, const char* code, uint64_t timestamp, int timeStep = 30, int window = 1);
-
-	// Generate a TOTP code for a given secret and timestamp
 	void generateTOTP(const char* secret, uint64_t timestamp, char* output, int timeStep = 30);
 }

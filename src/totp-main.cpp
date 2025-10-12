@@ -6,16 +6,10 @@
  *  The original code is copyright (c) 2025, itsneufox.
  */
 
-// Required for most of open.mp.
 #include <sdk.hpp>
-
-// Include the globally shared definitions for this component.
 #include "totp-interface.hpp"
-
-// Include the binary-local implementation for this component.
 #include "totp-component.hpp"
 
-// Automatically called when the compiled binary is loaded.
 COMPONENT_ENTRY_POINT()
 {
 	return TOTPComponent::getInstance();

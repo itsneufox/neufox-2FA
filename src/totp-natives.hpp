@@ -8,8 +8,5 @@
  *  The original code is copyright (c) 2025, itsneufox.
  */
 
-// Include pawn-natives macros (`SCRIPT_API`) and lookups (`IPlayer&`).
 #include <Server/Components/Pawn/Impl/pawn_natives.hpp>
-
-// To get the component.
 #include "totp-component.hpp"

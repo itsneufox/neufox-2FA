@@ -8,18 +8,12 @@
  *  The original code is copyright (c) 2025, itsneufox.
  */
 
-// Required for most of open.mp.
 #include <sdk.hpp>
-
-// This is the private implementation of the public interface.  We must know the interface.
 #include "totp-interface.hpp"
 
-// Import open.mp structures that aren't ABI safe.
 using namespace Impl;
 
-// `final` so we don't need virtual destructors.  Also because we know it isn't inherited.
 class TOTPExtension final
-	// This class is an implementation of the publicly shared `ITOTPExtension` interface.
 	: public ITOTPExtension
 {
 private:
@@ -39,7 +33,6 @@ public:
 		secret_[0] = '\0';
 	}
 
-	// Implementations of the various methods from the public API.
 	bool isEnabled() const override;
 
 	bool isVerified() const override;
@@ -64,7 +57,6 @@ public:
 
 	void setLastAttempt(TimePoint time) override;
 
-	// Required extension methods.
 	void freeExtension() override;
 
 	void reset() override;

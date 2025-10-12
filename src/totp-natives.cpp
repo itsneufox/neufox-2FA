@@ -6,24 +6,11 @@
  *  The original code is copyright (c) 2025, itsneufox.
  */
 
-// Required for most of open.mp.
 #include <sdk.hpp>
-
-// Include the globally shared definitions for this component.
 #include "totp-interface.hpp"
-
-// Contains wrappers for component access.
 #include "totp-natives.hpp"
-
-// Include the extension definition.
 #include "totp-extension.hpp"
 
-// `SCRIPT_API` is an enhanced wrapper around the old *pawn-natives* system:
-//
-//   https://github.com/Y-Less/pawn-natives
-//
-
-// Generate a new random TOTP secret for a player
 // native bool:TOTP_GenerateSecret(playerid, output[], size = sizeof(output));
 SCRIPT_API(TOTP_GenerateSecret, bool(IPlayer& player, String& output))
 {

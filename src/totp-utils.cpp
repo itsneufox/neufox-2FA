@@ -42,14 +42,13 @@ namespace
 			if (c == ' ' || c == '\n' || c == '\r' || c == '\t' || c == '-')
 				continue;
 
-			// Convert character to value
 			int val = -1;
 			if (c >= 'A' && c <= 'Z')
 				val = c - 'A';
 			else if (c >= '2' && c <= '7')
 				val = c - '2' + 26;
 			else if (c >= 'a' && c <= 'z')
-				val = c - 'a'; // Accept lowercase
+				val = c - 'a';
 
 			if (val < 0)
 				return false;
@@ -75,11 +74,9 @@ namespace TOTPUtils
 		if (length < 17)
 			return;
 
-		// Use OpenSSL's cryptographically secure random
-		uint8_t randomBytes[16]; // 16 bytes = 128 bits for 16 base32 chars
+		uint8_t randomBytes[16];
 		if (RAND_bytes(randomBytes, sizeof(randomBytes)) != 1)
 		{
-			// Fallback to less secure method if OpenSSL fails
 			std::random_device rd;
 			std::mt19937 gen(rd());
 			std::uniform_int_distribution<> dis(0, 31);
@@ -90,18 +87,14 @@ namespace TOTPUtils
 		}
 		else
 		{
-			// Convert random bytes to base32
 			for (size_t i = 0; i < 16; i++)
-			{
 				output[i] = BASE32_CHARS[randomBytes[i] % 32];
-			}
 		}
 		output[16] = '\0';
 	}
 
 	void generateTOTP(const char* secret, uint64_t timestamp, char* output, int timeStep)
 	{
-		// Decode base32 secret
 		uint8_t key[64];
 		size_t keyLen;
 		if (!decodeBase32(secret, key, &keyLen))
@@ -110,10 +103,8 @@ namespace TOTPUtils
 			return;
 		}
 
-		// Calculate time step
 		uint64_t timeCounter = timestamp / timeStep;
 
-		// Convert to big-endian bytes
 		uint8_t timeBytes[8];
 		for (int i = 7; i >= 0; i--)
 		{
@@ -121,18 +112,15 @@ namespace TOTPUtils
 			timeCounter >>= 8;
 		}
 
-		// Calculate HMAC-SHA1
 		uint8_t hash[20];
 		hmacSHA1(key, keyLen, timeBytes, 8, hash);
 
-		// Dynamic truncation (RFC 4226)
 		int offset = hash[19] & 0x0F;
 		uint32_t code = ((hash[offset] & 0x7F) << 24)
 		              | ((hash[offset + 1] & 0xFF) << 16)
 		              | ((hash[offset + 2] & 0xFF) << 8)
 		              | (hash[offset + 3] & 0xFF);
 
-		// Generate 6-digit code
 		code = code % 1000000;
 		sprintf(output, "%06u", code);
 	}
@@ -142,14 +130,12 @@ namespace TOTPUtils
 		if (!secret || !code || strlen(code) != 6)
 			return false;
 
-		// Check code is numeric
 		for (int i = 0; i < 6; i++)
 		{
 			if (code[i] < '0' || code[i] > '9')
 				return false;
 		}
 
-		// Try current time window and adjacent windows
 		for (int i = -window; i <= window; i++)
 		{
 			uint64_t adjustedTime = timestamp + (i * timeStep);

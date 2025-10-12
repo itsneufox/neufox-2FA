@@ -8,7 +8,6 @@
  *  The original code is copyright (c) 2025, itsneufox.
  */
 
-// Required for most of open.mp.
 #include <sdk.hpp>
 
 // Maximum length for a base32 encoded secret (16 characters = 80 bits)
@@ -20,7 +19,6 @@ struct ITOTPExtension : IExtension
 	// Visit https://open.mp/uid to generate a new unique ID (different to the component UID).
 	PROVIDE_EXT_UID(0x213BD4923106B488);
 
-	// Public methods to manage TOTP for this player.
 	virtual bool isEnabled() const = 0;
 
 	virtual bool isVerified() const = 0;
