@@ -37,7 +37,8 @@ jobs:
     
     - name: Configure CMake
       run: |
-        cmake -S . -B build -G "Visual Studio 17 2022" -A ${{ matrix.arch }} -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}\vcpkg\scripts\buildsystems\vcpkg.cmake"
+        $triplet = if ("${{ matrix.arch }}" -eq "Win32") { "x86-windows-static" } else { "x64-windows-static" }
+        cmake -S . -B build -G "Visual Studio 17 2022" -A ${{ matrix.arch }} -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}\vcpkg\scripts\buildsystems\vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=$triplet
       shell: powershell
     
     - name: Build
