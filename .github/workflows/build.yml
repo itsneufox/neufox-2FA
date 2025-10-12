@@ -88,6 +88,12 @@ jobs:
         Write-Host "`nABI check passed: ComponentEntryPoint is correctly exported"
       shell: powershell
 
+    - name: Debug - List build outputs
+      run: |
+        Write-Host "DLL and PDB files:"
+        Get-ChildItem -Recurse build -Include *.dll,*.pdb | Select-Object FullName
+      shell: powershell
+
     - name: Package with CPack
       run: |
         cd build
@@ -130,19 +136,11 @@ jobs:
         }
       shell: powershell
     
-    - name: Upload runtime artifacts
+    - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: neufox-2fa-windows-${{ matrix.arch }}-runtime
-        path: |
-          artifacts/neufox-2fa-*.zip
-          !artifacts/neufox-2fa-*-debug-*.zip
-    
-    - name: Upload debug symbols
-      uses: actions/upload-artifact@v4
-      with:
-        name: neufox-2fa-windows-${{ matrix.arch }}-debug
-        path: artifacts/neufox-2fa-*-debug-*.zip
+        name: neufox-2fa-windows-${{ matrix.arch }}
+        path: artifacts/*.zip
 
   build-linux:
     runs-on: ubuntu-22.04
