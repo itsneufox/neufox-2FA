@@ -7,11 +7,11 @@ add_subdirectory(sdk)
 add_subdirectory(network)
 
 include_directories(
+	${CMAKE_CURRENT_SOURCE_DIR}
 	src
 	sdk/include
 	pawn/source
 	pawn/source/linux
-	pawn-natives
 )
 
 add_definitions(
