@@ -49,6 +49,16 @@ bool TOTPComponent::enableTOTP(IPlayer& player, const char* secret)
 		data->resetFailedAttempts();
 		eventDispatcher_.dispatch(&TOTPEventHandler::onTOTPEnabled, player);
 
+		if (pawn_)
+		{
+			int playerID = player.getID();
+			for (IPawnScript* script : pawn_->sideScripts())
+				script->Call("OnPlayerTOTPEnable", DefaultReturnValue_False, playerID);
+
+			if (auto script = pawn_->mainScript())
+				script->Call("OnPlayerTOTPEnable", DefaultReturnValue_False, playerID);
+		}
+
 		return true;
 	}
 
@@ -63,6 +73,16 @@ bool TOTPComponent::disableTOTP(IPlayer& player)
 		data->setVerified(false);
 		data->setSecret("");
 		eventDispatcher_.dispatch(&TOTPEventHandler::onTOTPDisabled, player);
+
+		if (pawn_)
+		{
+			int playerID = player.getID();
+			for (IPawnScript* script : pawn_->sideScripts())
+				script->Call("OnPlayerTOTPDisable", DefaultReturnValue_False, playerID);
+
+			if (auto script = pawn_->mainScript())
+				script->Call("OnPlayerTOTPDisable", DefaultReturnValue_False, playerID);
+		}
 
 		return true;
 	}

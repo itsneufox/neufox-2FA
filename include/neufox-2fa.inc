@@ -167,3 +167,25 @@ native TOTP_GetFailedAttempts(playerid);
  */
 forward OnPlayerTOTPVerify(playerid, bool:success);
 
+/**
+ * <library>neufox-2fa</library>
+ * <param name="playerid">The ID of the player who enabled 2FA.</param>
+ * <summary>This callback is triggered when a player enables TOTP 2FA.</summary>
+ * <remarks>
+ *   Called when TOTP_Enable is successfully executed for a player.
+ *   Use this for logging, notifications, or database updates.
+ * </remarks>
+ */
+forward OnPlayerTOTPEnable(playerid);
+
+/**
+ * <library>neufox-2fa</library>
+ * <param name="playerid">The ID of the player who disabled 2FA.</param>
+ * <summary>This callback is triggered when a player disables TOTP 2FA.</summary>
+ * <remarks>
+ *   Called when TOTP_Disable is successfully executed for a player.
+ *   Use this for logging, notifications, or database updates.
+ * </remarks>
+ */
+forward OnPlayerTOTPDisable(playerid);
+
