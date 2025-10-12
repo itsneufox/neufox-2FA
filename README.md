@@ -160,6 +160,10 @@ neufox-2fa-{platform}-{arch}-{version}.zip
 
 See the [wiki](../../wiki) for detailed documentation and examples.
 
+## Example Gamemode
+
+For a complete working implementation, check out the [omp-base-script-with-2FA](https://github.com/itsneufox/omp-base-script-with-2FA) - a practical example showing how to integrate this component with MySQL, handle callbacks, and implement the full 2FA flow.
+
 ## License
 
 This project is licensed under the Mozilla Public License 2.0. See [LICENSE](LICENSE) for details.
