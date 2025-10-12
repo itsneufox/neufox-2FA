@@ -32,13 +32,23 @@ jobs:
     - name: Install dependencies
       run: |
         $triplet = if ("${{ matrix.arch }}" -eq "Win32") { "x86-windows-static" } else { "x64-windows-static" }
-        .\vcpkg\vcpkg.exe install glm:$triplet robin-hood-hashing:$triplet span-lite:$triplet string-view-lite:$triplet openssl:$triplet
+        Write-Host "Installing dependencies for triplet: $triplet"
+        .\vcpkg\vcpkg.exe install glm:$triplet robin-hood-hashing:$triplet span-lite:$triplet string-view-lite:$triplet openssl:$triplet --triplet $triplet
+        if ($LASTEXITCODE -ne 0) {
+          Write-Error "vcpkg install failed with exit code $LASTEXITCODE"
+          exit $LASTEXITCODE
+        }
+        Write-Host "Verifying OpenSSL installation:"
+        Test-Path "vcpkg\installed\$triplet\include\openssl" -PathType Container
+        Test-Path "vcpkg\installed\$triplet\lib" -PathType Container
+        Get-ChildItem "vcpkg\installed\$triplet\lib" -Filter "*ssl*"
       shell: powershell
     
     - name: Configure CMake
       run: |
         $triplet = if ("${{ matrix.arch }}" -eq "Win32") { "x86-windows-static" } else { "x64-windows-static" }
-        cmake -S . -B build -G "Visual Studio 17 2022" -A ${{ matrix.arch }} -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}\vcpkg\scripts\buildsystems\vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=$triplet
+        $env:VCPKG_DEFAULT_TRIPLET = $triplet
+        cmake -S . -B build -G "Visual Studio 17 2022" -A ${{ matrix.arch }} -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}\vcpkg\scripts\buildsystems\vcpkg.cmake" -DVCPKG_TARGET_TRIPLET="$triplet"
       shell: powershell
     
     - name: Build
