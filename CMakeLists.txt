@@ -10,6 +10,7 @@ include_directories(
 	src
 	pawn/source
 	pawn/source/linux
+	pawn-natives
 )
 
 add_definitions(
