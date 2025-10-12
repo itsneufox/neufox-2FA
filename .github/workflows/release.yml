@@ -274,11 +274,13 @@ jobs:
     name: Create Main Release
     runs-on: ubuntu-latest
     needs: [prepare-version, build-windows, build-linux]
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        
+        with:
+          fetch-depth: 0
+
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
@@ -374,11 +376,13 @@ jobs:
     name: Create Debug Symbols Release
     runs-on: ubuntu-latest
     needs: [prepare-version, build-windows, create-release]
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        
+        with:
+          fetch-depth: 0
+
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
