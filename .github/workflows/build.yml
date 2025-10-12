@@ -31,7 +31,7 @@ jobs:
     
     - name: Install dependencies
       run: |
-        $triplet = if ("${{ matrix.arch }}" -eq "Win32") { "x86-windows" } else { "x64-windows" }
+        $triplet = if ("${{ matrix.arch }}" -eq "Win32") { "x86-windows-static" } else { "x64-windows-static" }
         .\vcpkg\vcpkg.exe install glm:$triplet robin-hood-hashing:$triplet span-lite:$triplet string-view-lite:$triplet openssl:$triplet
       shell: powershell
     
@@ -51,8 +51,9 @@ jobs:
         Write-Host "Build output files:"
         Get-ChildItem "build\${{ matrix.config }}" -File
         Write-Host "`nCopying artifacts..."
-        Get-ChildItem "build\${{ matrix.config }}\*.dll" | Copy-Item -Destination artifacts\ -Verbose
-        Get-ChildItem "build\${{ matrix.config }}\*.pdb" | Copy-Item -Destination artifacts\ -Verbose
+        # Only copy our component DLL and PDB (OpenSSL is statically linked)
+        Get-ChildItem "build\${{ matrix.config }}\neufox-2fa-*.dll" | Copy-Item -Destination artifacts\ -Verbose
+        Get-ChildItem "build\${{ matrix.config }}\neufox-2fa-*.pdb" | Copy-Item -Destination artifacts\ -Verbose
         Write-Host "`nArtifacts directory:"
         Get-ChildItem artifacts\
       shell: powershell

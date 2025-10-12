@@ -83,13 +83,14 @@ if ($UseDocker) {
     $outputDir = "build-windows-$Arch"
     
     # Install dependencies
-    Write-Host "Installing dependencies via vcpkg..." -ForegroundColor Green
+    Write-Host "Installing dependencies via vcpkg (static linking)..." -ForegroundColor Green
+    $vcpkgArchStatic = "$vcpkgArch-static"
     $dependencies = @(
-        "glm:$vcpkgArch",
-        "robin-hood-hashing:$vcpkgArch",
-        "span-lite:$vcpkgArch",
-        "string-view-lite:$vcpkgArch",
-        "openssl:$vcpkgArch"
+        "glm:$vcpkgArchStatic",
+        "robin-hood-hashing:$vcpkgArchStatic",
+        "span-lite:$vcpkgArchStatic",
+        "string-view-lite:$vcpkgArchStatic",
+        "openssl:$vcpkgArchStatic"
     )
     
     foreach ($dep in $dependencies) {

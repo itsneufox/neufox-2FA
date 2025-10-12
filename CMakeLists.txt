@@ -94,32 +94,9 @@ endif()
 
 # Windows-specific configuration
 if(WIN32)
-    # Enable PDB generation for all configurations
     set_target_properties(${PROJECT_NAME} PROPERTIES
         COMPILE_PDB_NAME "${OUTPUT_NAME}"
         COMPILE_PDB_OUTPUT_DIRECTORY "$<TARGET_FILE_DIR:${PROJECT_NAME}>"
     )
-    
-    # Get OpenSSL Crypto DLL path
-    get_target_property(OPENSSL_CRYPTO_DLL OpenSSL::Crypto IMPORTED_LOCATION_RELEASE)
-    
-    if(NOT OPENSSL_CRYPTO_DLL)
-        get_target_property(OPENSSL_CRYPTO_DLL OpenSSL::Crypto IMPORTED_LOCATION)
-    endif()
-    
-    # Copy OpenSSL Crypto DLL to output directory
-    if(OPENSSL_CRYPTO_DLL)
-        add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                "${OPENSSL_CRYPTO_DLL}"
-                "$<TARGET_FILE_DIR:${PROJECT_NAME}>"
-            COMMENT "Copying OpenSSL Crypto DLL to output directory"
-        )
-        message(STATUS "OpenSSL Crypto DLL: ${OPENSSL_CRYPTO_DLL}")
-    else()
-        message(WARNING "OpenSSL Crypto DLL not found")
-    endif()
-    
-    message(STATUS "PDB file will be generated as ${OUTPUT_NAME}.pdb")
 endif()
 
