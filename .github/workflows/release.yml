@@ -136,42 +136,58 @@ jobs:
         cmake --build build --config ${{ matrix.config }} --parallel
       shell: powershell
     
-    - name: Package artifacts
+    - name: Package with CPack
       run: |
-        $archName = if ("${{ matrix.arch }}" -eq "Win32") { "x86" } else { "x64" }
-        $packageName = "neufox-2fa-windows-$archName-${{ needs.prepare-version.outputs.build_version }}"
-        
-        # Create folder structure
-        New-Item -ItemType Directory -Path "$packageName\components" -Force | Out-Null
-        New-Item -ItemType Directory -Path "$packageName\include" -Force | Out-Null
-        
-        Write-Host "Build output files:"
-        Get-ChildItem "build\${{ matrix.config }}" -File
-        
-        Write-Host "`nCopying artifacts..."
-        # Copy DLL and PDB to components folder
-        Copy-Item "build\${{ matrix.config }}\neufox-2fa-*.dll" -Destination "$packageName\components\" -Verbose
-        Copy-Item "build\${{ matrix.config }}\neufox-2fa-*.pdb" -Destination "$packageName\components\" -Verbose
-        
-        # Copy include file
-        Copy-Item "include\neufox-2fa.inc" -Destination "$packageName\include\" -Verbose
-        
-        Write-Host "`nPackage structure:"
-        Get-ChildItem $packageName -Recurse
-        
-        # Create zip
-        Compress-Archive -Path "$packageName\*" -DestinationPath "$packageName.zip" -Force
-        
-        # Move to artifacts folder
-        New-Item -ItemType Directory -Path artifacts -Force | Out-Null
-        Move-Item "$packageName.zip" -Destination artifacts\ -Verbose
+        cd build
+        cpack -G ZIP -C ${{ matrix.config }}
+        Write-Host "`nGenerated packages:"
+        Get-ChildItem *.zip
       shell: powershell
     
-    - name: Upload artifacts
+    - name: Organize packages
+      run: |
+        $archName = if ("${{ matrix.arch }}" -eq "Win32") { "x86" } else { "x64" }
+        $version = "${{ needs.prepare-version.outputs.build_version }}"
+        
+        # Create artifacts directory
+        New-Item -ItemType Directory -Path artifacts -Force | Out-Null
+        
+        # Find and rename packages with version
+        Get-ChildItem build\*.zip | ForEach-Object {
+          # Add version suffix
+          $newName = $_.Name -replace '\.zip$', "-$version.zip"
+          
+          Write-Host "Package: $newName"
+          Copy-Item $_.FullName -Destination "artifacts\$newName"
+          
+          # Generate SHA256
+          $hash = Get-FileHash -Path "artifacts\$newName" -Algorithm SHA256
+          $hash.Hash.ToLower() | Out-File -FilePath "artifacts\$newName.sha256" -Encoding ASCII
+        }
+        
+        Write-Host "`nPackage contents:"
+        Get-ChildItem artifacts\*.zip | ForEach-Object {
+          Write-Host "`n$($_.Name):"
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $zip = [System.IO.Compression.ZipFile]::OpenRead($_.FullName)
+          $zip.Entries | ForEach-Object { Write-Host "  - $($_.Name)" }
+          $zip.Dispose()
+        }
+      shell: powershell
+    
+    - name: Upload runtime artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: neufox-2fa-windows-${{ matrix.arch }}
-        path: artifacts/*.zip
+        name: neufox-2fa-windows-${{ matrix.arch }}-runtime
+        path: |
+          artifacts/neufox-2fa-*.zip
+          !artifacts/neufox-2fa-*-debug-*.zip
+    
+    - name: Upload debug symbols
+      uses: actions/upload-artifact@v4
+      with:
+        name: neufox-2fa-windows-${{ matrix.arch }}-debug
+        path: artifacts/neufox-2fa-*-debug-*.zip
 
   build-linux:
     name: Build Linux
@@ -250,7 +266,7 @@ jobs:
         path: artifacts/*.tar.gz
 
   create-release:
-    name: Create Release
+    name: Create Main Release
     runs-on: ubuntu-latest
     needs: [prepare-version, build-windows, build-linux]
     
@@ -263,16 +279,50 @@ jobs:
         with:
           path: artifacts
       
-      - name: Prepare release files
+      - name: Generate changelog
+        id: changelog
+        run: |
+          # Get the previous tag
+          PREV_TAG=$(git tag --sort=-version:refname | grep -v "debug" | head -n 1)
+          
+          if [ -z "$PREV_TAG" ]; then
+            echo "No previous release found, showing all commits"
+            CHANGELOG=$(git log --pretty=format:"- %s (%h)" --no-merges)
+          else
+            echo "Generating changelog from $PREV_TAG to HEAD"
+            CHANGELOG=$(git log ${PREV_TAG}..HEAD --pretty=format:"- %s (%h)" --no-merges)
+          fi
+          
+          # Handle empty changelog
+          if [ -z "$CHANGELOG" ]; then
+            CHANGELOG="- Initial release"
+          fi
+          
+          # Save to file and output
+          echo "$CHANGELOG" > changelog.txt
+          echo "Changelog:"
+          cat changelog.txt
+          
+          # Export for use in next step (handle multiline)
+          {
+            echo 'CHANGELOG<<EOF'
+            echo "$CHANGELOG"
+            echo 'EOF'
+          } >> $GITHUB_OUTPUT
+      
+      - name: Prepare runtime release files
         run: |
           mkdir -p release-files
-          find artifacts -name "*.zip" -exec cp {} release-files/ \;
+          # Copy runtime packages only (exclude debug)
+          find artifacts -name "*.zip" ! -name "*-debug-*" -exec cp {} release-files/ \;
           find artifacts -name "*.tar.gz" -exec cp {} release-files/ \;
-          echo "Release files:"
+          # Copy corresponding SHA256 files
+          find artifacts -name "*.sha256" ! -name "*-debug-*" -exec cp {} release-files/ \;
+          
+          echo "Runtime release files:"
           ls -lh release-files/
         
-      - name: Create Release
-        id: create_release
+      - name: Create Main Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -282,29 +332,90 @@ jobs:
           
           **Installation:**
           1. Download the package for your platform:
-             - Windows: \`neufox-2fa-windows-{x86|x64}-${{ needs.prepare-version.outputs.build_version }}.zip\`
+             - Windows: \`neufox-2fa-x64-${{ needs.prepare-version.outputs.build_version }}.zip\` or \`neufox-2fa-x86-${{ needs.prepare-version.outputs.build_version }}.zip\`
              - Linux: \`neufox-2fa-linux-{x86|x64}-{static|dynssl}-${{ needs.prepare-version.outputs.build_version }}.tar.gz\`
           2. Extract the archive into your server directory
-          3. The \`components/\` folder contains the component library
-          4. The \`include/\` folder contains the Pawn include file
+          3. Load the component in your server configuration
           
           **Features:**
           - Time-based One-Time Password (TOTP) authentication
           - Compatible with Google Authenticator, Authy, and other authenticator apps
           - Failed attempt tracking with cooldown system
           - Easy integration with existing authentication systems
-          - OpenSSL static linking on Windows (no extra DLLs needed)
-          
+            
           **Linux Variants:**
           - \`static\`: Statically linked OpenSSL (recommended, no dependencies)
           - \`dynssl\`: Dynamically linked OpenSSL (requires libssl on server)
           
-          ${{ needs.prepare-version.outputs.is_prerelease == 'true' && '### Pre-release
-          This is a pre-release for testing and feedback. Please report any issues!' || '### Stable Release
-          This is an official stable release.' }}
+          ${{ needs.prepare-version.outputs.is_prerelease == 'true' && '> **Note:** This is a pre-release for testing. Please report any issues!' || '' }}
+          
+          ---
+          
+          ### 📋 Changelog
+          
+          ${{ steps.changelog.outputs.CHANGELOG }}
+          
+          ---
+          
+          **Debug Symbols:** For debugging crashes or development, see the [${{ needs.prepare-version.outputs.tag_name }}-debug](https://github.com/${{ github.repository }}/releases/tag/${{ needs.prepare-version.outputs.tag_name }}-debug) release.
           
           **Wiki:** https://github.com/${{ github.repository }}/wiki  
-          **Issues & Feedback:** https://github.com/${{ github.repository }}/issues" \
+          **Issues:** https://github.com/${{ github.repository }}/issues" \
             ${{ needs.prepare-version.outputs.is_prerelease == 'true' && '--prerelease' || '' }} \
+            --latest \
             release-files/*
+  
+  create-debug-release:
+    name: Create Debug Symbols Release
+    runs-on: ubuntu-latest
+    needs: [prepare-version, build-windows, create-release]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      
+      - name: Prepare debug release files
+        run: |
+          mkdir -p debug-files
+          # Copy debug packages only
+          find artifacts -name "*-debug-*.zip" -exec cp {} debug-files/ \;
+          find artifacts -name "*-debug-*.sha256" -exec cp {} debug-files/ \;
+          
+          echo "Debug symbol files:"
+          ls -lh debug-files/
+        
+      - name: Create Debug Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ needs.prepare-version.outputs.tag_name }}-debug" \
+            --title "${{ needs.prepare-version.outputs.release_name }} - Debug Symbols" \
+            --notes "### Debug Symbols (PDB Files)
+          
+          This release contains Windows PDB (Program Database) files for debugging purposes.
+          
+          **When do you need this?**
+          - Debugging server crashes related to this component
+          - Development and troubleshooting
+          - Analyzing crash dumps with detailed stack traces
+          
+          **You DO NOT need this for normal server operation.**
+          
+          **Installation:**
+          1. Download the PDB package matching your architecture:
+             - \`neufox-2fa-x64-debug-${{ needs.prepare-version.outputs.build_version }}.zip\`
+             - \`neufox-2fa-x86-debug-${{ needs.prepare-version.outputs.build_version }}.zip\`
+          2. Extract the PDB file to the same directory as the DLL
+          3. Use with debuggers like Visual Studio or WinDbg
+          
+          ---
+          
+          **Main Release:** [${{ needs.prepare-version.outputs.release_name }}](https://github.com/${{ github.repository }}/releases/tag/${{ needs.prepare-version.outputs.tag_name }})" \
+            --prerelease \
+            debug-files/*
 
