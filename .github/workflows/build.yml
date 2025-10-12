@@ -54,42 +54,61 @@ jobs:
         cmake --build build --config ${{ matrix.config }} --parallel
       shell: powershell
     
-    - name: Package artifacts
+    - name: Package with CPack
       run: |
-        $archName = if ("${{ matrix.arch }}" -eq "Win32") { "x86" } else { "x64" }
-        $packageName = "neufox-2fa-windows-$archName"
-        
-        # Create folder structure
-        New-Item -ItemType Directory -Path "$packageName\components" -Force | Out-Null
-        New-Item -ItemType Directory -Path "$packageName\include" -Force | Out-Null
-        
-        Write-Host "Build output files:"
-        Get-ChildItem "build\${{ matrix.config }}" -File
-        
-        Write-Host "`nCopying artifacts..."
-        # Copy DLL and PDB to components folder
-        Copy-Item "build\${{ matrix.config }}\neufox-2fa-*.dll" -Destination "$packageName\components\" -Verbose
-        Copy-Item "build\${{ matrix.config }}\neufox-2fa-*.pdb" -Destination "$packageName\components\" -Verbose
-        
-        # Copy include file
-        Copy-Item "include\neufox-2fa.inc" -Destination "$packageName\include\" -Verbose
-        
-        Write-Host "`nPackage structure:"
-        Get-ChildItem $packageName -Recurse
-        
-        # Create zip
-        Compress-Archive -Path "$packageName\*" -DestinationPath "$packageName.zip" -Force
-        
-        # Move to artifacts folder
-        New-Item -ItemType Directory -Path artifacts -Force | Out-Null
-        Move-Item "$packageName.zip" -Destination artifacts\ -Verbose
+        cd build
+        cpack -G ZIP -C ${{ matrix.config }}
+        Write-Host "`nGenerated packages:"
+        Get-ChildItem *.zip
       shell: powershell
     
-    - name: Upload artifacts
+    - name: Organize packages
+      run: |
+        $archName = if ("${{ matrix.arch }}" -eq "Win32") { "x86" } else { "x64" }
+        
+        # Create artifacts directory
+        New-Item -ItemType Directory -Path artifacts -Force | Out-Null
+        
+        # Find and rename packages
+        Get-ChildItem build\*.zip | ForEach-Object {
+          $newName = $_.Name
+          
+          # Add architecture info if not present
+          if ($_.Name -notmatch "x64|x86") {
+            $newName = $_.Name -replace '(neufox-2fa)', "`$1-$archName"
+          }
+          
+          Write-Host "Package: $newName"
+          Copy-Item $_.FullName -Destination "artifacts\$newName"
+          
+          # Generate SHA256
+          $hash = Get-FileHash -Path "artifacts\$newName" -Algorithm SHA256
+          $hash.Hash.ToLower() | Out-File -FilePath "artifacts\$newName.sha256" -Encoding ASCII
+        }
+        
+        Write-Host "`nPackage contents:"
+        Get-ChildItem artifacts\*.zip | ForEach-Object {
+          Write-Host "`n$($_.Name):"
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $zip = [System.IO.Compression.ZipFile]::OpenRead($_.FullName)
+          $zip.Entries | ForEach-Object { Write-Host "  - $($_.Name)" }
+          $zip.Dispose()
+        }
+      shell: powershell
+    
+    - name: Upload runtime artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: neufox-2fa-windows-${{ matrix.arch }}
-        path: artifacts/*.zip
+        name: neufox-2fa-windows-${{ matrix.arch }}-runtime
+        path: |
+          artifacts/neufox-2fa-*.zip
+          !artifacts/neufox-2fa-*-debug-*.zip
+    
+    - name: Upload debug symbols
+      uses: actions/upload-artifact@v4
+      with:
+        name: neufox-2fa-windows-${{ matrix.arch }}-debug
+        path: artifacts/neufox-2fa-*-debug-*.zip
 
   build-linux:
     runs-on: ubuntu-22.04
