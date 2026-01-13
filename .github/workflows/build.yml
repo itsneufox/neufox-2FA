@@ -113,10 +113,10 @@ jobs:
         Compress-Archive -Path $dllFile.FullName -DestinationPath $runtimeZip
         Write-Host "Created: $runtimeZip"
 
-        # Create debug package (PDB only)
+        # Create debug package (DLL + PDB)
         if ($pdbFile) {
           $debugZip = "artifacts\neufox-2fa-$archName-debug.zip"
-          Compress-Archive -Path $pdbFile.FullName -DestinationPath $debugZip
+          Compress-Archive -Path $dllFile.FullName, $pdbFile.FullName -DestinationPath $debugZip
           Write-Host "Created: $debugZip"
         }
 

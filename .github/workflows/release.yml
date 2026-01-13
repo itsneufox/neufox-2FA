@@ -164,10 +164,10 @@ jobs:
         $hash.Hash.ToLower() | Out-File -FilePath "$runtimeZip.sha256" -Encoding ASCII
         Write-Host "Created: $runtimeZip"
 
-        # Create debug package (PDB only)
+        # Create debug package (DLL + PDB)
         if ($pdbFile) {
           $debugZip = "artifacts\neufox-2fa-$archName-debug-$version.zip"
-          Compress-Archive -Path $pdbFile.FullName -DestinationPath $debugZip
+          Compress-Archive -Path $dllFile.FullName, $pdbFile.FullName -DestinationPath $debugZip
           $hash = Get-FileHash -Path $debugZip -Algorithm SHA256
           $hash.Hash.ToLower() | Out-File -FilePath "$debugZip.sha256" -Encoding ASCII
           Write-Host "Created: $debugZip"
