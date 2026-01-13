@@ -88,54 +88,51 @@ jobs:
         Write-Host "`nABI check passed: ComponentEntryPoint is correctly exported"
       shell: powershell
 
-    - name: Debug - List build outputs
-      run: |
-        Write-Host "DLL and PDB files:"
-        Get-ChildItem -Recurse build -Include *.dll,*.pdb | Select-Object FullName
-      shell: powershell
-
-    - name: Package with CPack
-      run: |
-        cd build
-        cpack -G ZIP -C ${{ matrix.config }}
-        Write-Host "`nGenerated packages:"
-        Get-ChildItem *.zip
-      shell: powershell
-    
-    - name: Organize packages
+    - name: Package artifacts
       run: |
         $archName = if ("${{ matrix.arch }}" -eq "Win32") { "x86" } else { "x64" }
-        
-        # Create artifacts directory
+        $config = "${{ matrix.config }}"
+
         New-Item -ItemType Directory -Path artifacts -Force | Out-Null
-        
-        # Find and rename packages
-        Get-ChildItem build\*.zip | ForEach-Object {
-          $newName = $_.Name
-          
-          # Add architecture info if not present
-          if ($_.Name -notmatch "x64|x86") {
-            $newName = $_.Name -replace '(neufox-2fa)', "`$1-$archName"
-          }
-          
-          Write-Host "Package: $newName"
-          Copy-Item $_.FullName -Destination "artifacts\$newName"
-          
-          # Generate SHA256
-          $hash = Get-FileHash -Path "artifacts\$newName" -Algorithm SHA256
-          $hash.Hash.ToLower() | Out-File -FilePath "artifacts\$newName.sha256" -Encoding ASCII
+
+        # Find the DLL and PDB
+        $dllFile = Get-ChildItem -Recurse "build\$config" -Filter "neufox-2fa-*.dll" | Select-Object -First 1
+        $pdbFile = Get-ChildItem -Recurse "build\$config" -Filter "neufox-2fa-*.pdb" | Select-Object -First 1
+
+        Write-Host "Found DLL: $($dllFile.FullName)"
+        Write-Host "Found PDB: $($pdbFile.FullName)"
+
+        if (-not $dllFile) {
+          Write-Error "DLL not found in build\$config"
+          Get-ChildItem -Recurse build -Include *.dll,*.pdb | Select-Object FullName
+          exit 1
         }
-        
+
+        # Create runtime package (DLL only)
+        $runtimeZip = "artifacts\neufox-2fa-$archName.zip"
+        Compress-Archive -Path $dllFile.FullName -DestinationPath $runtimeZip
+        Write-Host "Created: $runtimeZip"
+
+        # Create debug package (PDB only)
+        if ($pdbFile) {
+          $debugZip = "artifacts\neufox-2fa-$archName-debug.zip"
+          Compress-Archive -Path $pdbFile.FullName -DestinationPath $debugZip
+          Write-Host "Created: $debugZip"
+        }
+
+        # Verify packages
         Write-Host "`nPackage contents:"
-        Get-ChildItem artifacts\*.zip | ForEach-Object {
-          Write-Host "`n$($_.Name):"
-          Add-Type -AssemblyName System.IO.Compression.FileSystem
-          $zip = [System.IO.Compression.ZipFile]::OpenRead($_.FullName)
-          $zip.Entries | ForEach-Object { Write-Host "  - $($_.Name)" }
+        Add-Type -AssemblyName System.IO.Compression.FileSystem
+        foreach ($zipFile in Get-ChildItem artifacts\*.zip) {
+          Write-Host "`n$($zipFile.Name):"
+          $zip = [System.IO.Compression.ZipFile]::OpenRead($zipFile.FullName)
+          foreach ($entry in $zip.Entries) {
+            Write-Host "  - $($entry.Name) ($($entry.Length) bytes)"
+          }
           $zip.Dispose()
         }
       shell: powershell
-    
+
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
@@ -208,31 +205,23 @@ jobs:
     - name: Package artifacts
       run: |
         PACKAGE_NAME="neufox-2fa-linux-${{ matrix.arch }}-${{ matrix.ssl }}"
-        
-        # Create folder structure
+
         mkdir -p "$PACKAGE_NAME/components"
         mkdir -p "$PACKAGE_NAME/include"
-        
+        mkdir -p artifacts
+
         echo "Build output files:"
         ls -lh build/
-        
+
         echo -e "\nCopying artifacts..."
-        # Copy .so to components folder
         find build -name "*.so" -exec cp -v {} "$PACKAGE_NAME/components/" \;
-        
-        # Copy include file
         cp -v include/neufox-2fa.inc "$PACKAGE_NAME/include/"
-        
+
         echo -e "\nPackage structure:"
         tree "$PACKAGE_NAME" || find "$PACKAGE_NAME" -type f
-        
-        # Create tar.gz
-        tar -czf "$PACKAGE_NAME.tar.gz" -C "$PACKAGE_NAME" .
-        
-        # Move to artifacts folder
-        mkdir -p artifacts
-        mv -v "$PACKAGE_NAME.tar.gz" artifacts/
-    
+
+        tar -czf "artifacts/$PACKAGE_NAME.tar.gz" -C "$PACKAGE_NAME" .
+
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
