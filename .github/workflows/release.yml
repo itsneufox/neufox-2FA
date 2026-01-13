@@ -311,36 +311,38 @@ jobs:
         run: |
           gh release create "${{ needs.prepare-version.outputs.tag_name }}" \
             --title "${{ needs.prepare-version.outputs.release_name }}" \
-            --notes "### neufox's 2FA Component - TOTP Two-Factor Authentication
-          
+            --notes-file - \
+            ${{ needs.prepare-version.outputs.is_prerelease == 'true' && '--prerelease' || '' }} \
+            --latest \
+            release-files/* <<'EOF'
+          ### neufox's 2FA Component - TOTP Two-Factor Authentication
+
           **Installation:**
           1. Download the package for your platform:
-             - Windows: \`neufox-2fa-x64-${{ needs.prepare-version.outputs.build_version }}.zip\` or \`neufox-2fa-x86-${{ needs.prepare-version.outputs.build_version }}.zip\`
-             - Linux: \`neufox-2fa-linux-{x86|x64}-{static|dynssl}-${{ needs.prepare-version.outputs.build_version }}.tar.gz\`
+             - Windows: `neufox-2fa-x64-${{ needs.prepare-version.outputs.build_version }}.zip` or `neufox-2fa-x86-${{ needs.prepare-version.outputs.build_version }}.zip`
+             - Linux: `neufox-2fa-linux-{x86|x64}-{static|dynssl}-${{ needs.prepare-version.outputs.build_version }}.tar.gz`
           2. Extract the archive into your server directory
           3. Load the component in your server configuration
-          
+
           **Features:**
           - Time-based One-Time Password (TOTP) authentication
           - Compatible with Google Authenticator, Authy, and other authenticator apps
           - Failed attempt tracking with cooldown system
           - Easy integration with existing authentication systems
-            
+
           **Linux Variants:**
-          - \`static\`: Statically linked OpenSSL (recommended, no dependencies)
-          - \`dynssl\`: Dynamically linked OpenSSL (requires libssl on server)
-          
+          - `static`: Statically linked OpenSSL (recommended, no dependencies)
+          - `dynssl`: Dynamically linked OpenSSL (requires libssl on server)
+
           ${{ needs.prepare-version.outputs.is_prerelease == 'true' && '> **Note:** This is a pre-release for testing. Please report any issues!' || '' }}
-          
+
           ---
-          
-          ### 📋 Changelog
-          
+
+          ### Changelog
+
           ${{ steps.changelog.outputs.CHANGELOG }}
 
           **Wiki:** https://github.com/${{ github.repository }}/wiki
-          **Issues:** https://github.com/${{ github.repository }}/issues" \
-            ${{ needs.prepare-version.outputs.is_prerelease == 'true' && '--prerelease' || '' }} \
-            --latest \
-            release-files/*
+          **Issues:** https://github.com/${{ github.repository }}/issues
+          EOF
 
