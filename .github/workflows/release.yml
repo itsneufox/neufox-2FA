@@ -157,48 +157,37 @@ jobs:
           exit 1
         }
 
-        # Create runtime package (DLL only)
-        $runtimeZip = "artifacts\neufox-2fa-$archName-$version.zip"
-        Compress-Archive -Path $dllFile.FullName -DestinationPath $runtimeZip
-        $hash = Get-FileHash -Path $runtimeZip -Algorithm SHA256
-        $hash.Hash.ToLower() | Out-File -FilePath "$runtimeZip.sha256" -Encoding ASCII
-        Write-Host "Created: $runtimeZip"
-
-        # Create debug package (DLL + PDB)
+        # Create folder structure
+        $packageDir = "package"
+        New-Item -ItemType Directory -Path "$packageDir\components" -Force | Out-Null
+        New-Item -ItemType Directory -Path "$packageDir\include" -Force | Out-Null
+        Copy-Item $dllFile.FullName -Destination "$packageDir\components\"
         if ($pdbFile) {
-          $debugZip = "artifacts\neufox-2fa-$archName-debug-$version.zip"
-          Compress-Archive -Path $dllFile.FullName, $pdbFile.FullName -DestinationPath $debugZip
-          $hash = Get-FileHash -Path $debugZip -Algorithm SHA256
-          $hash.Hash.ToLower() | Out-File -FilePath "$debugZip.sha256" -Encoding ASCII
-          Write-Host "Created: $debugZip"
+          Copy-Item $pdbFile.FullName -Destination "$packageDir\components\"
         }
+        Copy-Item "include\neufox-2fa.inc" -Destination "$packageDir\include\"
 
-        # Verify packages
+        $zipFile = "artifacts\neufox-2fa-$archName-$version.zip"
+        Compress-Archive -Path "$packageDir\*" -DestinationPath $zipFile
+        $hash = Get-FileHash -Path $zipFile -Algorithm SHA256
+        $hash.Hash.ToLower() | Out-File -FilePath "$zipFile.sha256" -Encoding ASCII
+        Write-Host "Created: $zipFile"
+
+        # Verify package
         Write-Host "`nPackage contents:"
         Add-Type -AssemblyName System.IO.Compression.FileSystem
-        foreach ($zipFile in Get-ChildItem artifacts\*.zip) {
-          Write-Host "`n$($zipFile.Name):"
-          $zip = [System.IO.Compression.ZipFile]::OpenRead($zipFile.FullName)
-          foreach ($entry in $zip.Entries) {
-            Write-Host "  - $($entry.Name) ($($entry.Length) bytes)"
-          }
-          $zip.Dispose()
+        $zip = [System.IO.Compression.ZipFile]::OpenRead($zipFile)
+        foreach ($entry in $zip.Entries) {
+          Write-Host "  - $($entry.FullName) ($($entry.Length) bytes)"
         }
+        $zip.Dispose()
       shell: powershell
 
-    - name: Upload runtime artifacts
+    - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: neufox-2fa-windows-${{ matrix.arch }}-runtime
-        path: |
-          artifacts/neufox-2fa-*.zip
-          !artifacts/neufox-2fa-*-debug-*.zip
-    
-    - name: Upload debug symbols
-      uses: actions/upload-artifact@v4
-      with:
-        name: neufox-2fa-windows-${{ matrix.arch }}-debug
-        path: artifacts/neufox-2fa-*-debug-*.zip
+        name: neufox-2fa-windows-${{ matrix.arch }}
+        path: artifacts/neufox-2fa-*.zip
 
   build-linux:
     name: Build Linux
@@ -348,71 +337,10 @@ jobs:
           ### 📋 Changelog
           
           ${{ steps.changelog.outputs.CHANGELOG }}
-          
-          ---
-          
-          **Debug Symbols:** For debugging crashes or development, see the [${{ needs.prepare-version.outputs.tag_name }}-debug](https://github.com/${{ github.repository }}/releases/tag/${{ needs.prepare-version.outputs.tag_name }}-debug) release.
-          
-          **Wiki:** https://github.com/${{ github.repository }}/wiki  
+
+          **Wiki:** https://github.com/${{ github.repository }}/wiki
           **Issues:** https://github.com/${{ github.repository }}/issues" \
             ${{ needs.prepare-version.outputs.is_prerelease == 'true' && '--prerelease' || '' }} \
             --latest \
             release-files/*
-  
-  create-debug-release:
-    name: Create Debug Symbols Release
-    runs-on: ubuntu-latest
-    needs: [prepare-version, build-windows, create-release]
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts
-      
-      - name: Prepare debug release files
-        run: |
-          mkdir -p debug-files
-          find artifacts -name "*-debug-*.zip" -exec cp {} debug-files/ \;
-          find artifacts -name "*-debug-*.sha256" -exec cp {} debug-files/ \;
-
-          if [ -z "$(ls -A debug-files 2>/dev/null)" ]; then
-            echo "ERROR: No debug files found to release"
-            exit 1
-          fi
-        
-      - name: Create Debug Release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh release create "${{ needs.prepare-version.outputs.tag_name }}-debug" \
-            --title "${{ needs.prepare-version.outputs.release_name }} - Debug Symbols" \
-            --notes "### Debug Symbols (PDB Files)
-          
-          This release contains Windows PDB (Program Database) files for debugging purposes.
-          
-          **When do you need this?**
-          - Debugging server crashes related to this component
-          - Development and troubleshooting
-          - Analyzing crash dumps with detailed stack traces
-          
-          **You DO NOT need this for normal server operation.**
-          
-          **Installation:**
-          1. Download the PDB package matching your architecture:
-             - \`neufox-2fa-x64-debug-${{ needs.prepare-version.outputs.build_version }}.zip\`
-             - \`neufox-2fa-x86-debug-${{ needs.prepare-version.outputs.build_version }}.zip\`
-          2. Extract the PDB file to the same directory as the DLL
-          3. Use with debuggers like Visual Studio or WinDbg
-          
-          ---
-          
-          **Main Release:** [${{ needs.prepare-version.outputs.release_name }}](https://github.com/${{ github.repository }}/releases/tag/${{ needs.prepare-version.outputs.tag_name }})" \
-            --prerelease \
-            debug-files/*
 

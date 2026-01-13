@@ -108,29 +108,28 @@ jobs:
           exit 1
         }
 
-        # Create runtime package (DLL only)
-        $runtimeZip = "artifacts\neufox-2fa-$archName.zip"
-        Compress-Archive -Path $dllFile.FullName -DestinationPath $runtimeZip
-        Write-Host "Created: $runtimeZip"
-
-        # Create debug package (DLL + PDB)
+        # Create folder structure
+        $packageDir = "package"
+        New-Item -ItemType Directory -Path "$packageDir\components" -Force | Out-Null
+        New-Item -ItemType Directory -Path "$packageDir\include" -Force | Out-Null
+        Copy-Item $dllFile.FullName -Destination "$packageDir\components\"
         if ($pdbFile) {
-          $debugZip = "artifacts\neufox-2fa-$archName-debug.zip"
-          Compress-Archive -Path $dllFile.FullName, $pdbFile.FullName -DestinationPath $debugZip
-          Write-Host "Created: $debugZip"
+          Copy-Item $pdbFile.FullName -Destination "$packageDir\components\"
         }
+        Copy-Item "include\neufox-2fa.inc" -Destination "$packageDir\include\"
 
-        # Verify packages
+        $zipFile = "artifacts\neufox-2fa-$archName.zip"
+        Compress-Archive -Path "$packageDir\*" -DestinationPath $zipFile
+        Write-Host "Created: $zipFile"
+
+        # Verify package
         Write-Host "`nPackage contents:"
         Add-Type -AssemblyName System.IO.Compression.FileSystem
-        foreach ($zipFile in Get-ChildItem artifacts\*.zip) {
-          Write-Host "`n$($zipFile.Name):"
-          $zip = [System.IO.Compression.ZipFile]::OpenRead($zipFile.FullName)
-          foreach ($entry in $zip.Entries) {
-            Write-Host "  - $($entry.Name) ($($entry.Length) bytes)"
-          }
-          $zip.Dispose()
+        $zip = [System.IO.Compression.ZipFile]::OpenRead($zipFile)
+        foreach ($entry in $zip.Entries) {
+          Write-Host "  - $($entry.FullName) ($($entry.Length) bytes)"
         }
+        $zip.Dispose()
       shell: powershell
 
     - name: Upload artifacts
