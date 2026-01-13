@@ -138,13 +138,23 @@ jobs:
     
     - name: Install
       run: |
-        cmake --install build --config ${{ matrix.config }}
+        cmake --install build --config ${{ matrix.config }} --verbose
+      shell: powershell
+
+    - name: Debug - List build outputs
+      run: |
+        Write-Host "DLL and PDB files in build directory:"
+        Get-ChildItem -Recurse build -Include *.dll,*.pdb | Select-Object FullName, Length
       shell: powershell
 
     - name: Package with CPack
       run: |
         cd build
-        cpack -G ZIP -C ${{ matrix.config }}
+        cpack -G ZIP -C ${{ matrix.config }} --verbose
+        Write-Host "`nGenerated packages:"
+        Get-ChildItem *.zip | ForEach-Object {
+          Write-Host "$($_.Name) - $($_.Length) bytes"
+        }
       shell: powershell
 
     - name: Organize packages
@@ -160,6 +170,27 @@ jobs:
 
           $hash = Get-FileHash -Path "artifacts\$newName" -Algorithm SHA256
           $hash.Hash.ToLower() | Out-File -FilePath "artifacts\$newName.sha256" -Encoding ASCII
+        }
+
+        Write-Host "`nPackage contents:"
+        Add-Type -AssemblyName System.IO.Compression.FileSystem
+        $emptyZips = @()
+        foreach ($zipFile in Get-ChildItem artifacts\*.zip) {
+          Write-Host "`n$($zipFile.Name):"
+          $zip = [System.IO.Compression.ZipFile]::OpenRead($zipFile.FullName)
+          if ($zip.Entries.Count -eq 0) {
+            Write-Host "  ERROR: ZIP is empty!"
+            $emptyZips += $zipFile.Name
+          } else {
+            foreach ($entry in $zip.Entries) {
+              Write-Host "  - $($entry.Name) ($($entry.Length) bytes)"
+            }
+          }
+          $zip.Dispose()
+        }
+        if ($emptyZips.Count -gt 0) {
+          Write-Error "Empty ZIP files found: $($emptyZips -join ', ')"
+          exit 1
         }
       shell: powershell
     
