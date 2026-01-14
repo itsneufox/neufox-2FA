@@ -71,18 +71,23 @@ endif()
 
 if(WIN32)
     set(PLATFORM_NAME "win")
-    set(OUTPUT_NAME "neufox-2fa-${PLATFORM_NAME}-${ARCH_NAME}")
 else()
     set(PLATFORM_NAME "linux")
-    set(OUTPUT_NAME "neufox-2fa-${PLATFORM_NAME}-${ARCH_NAME}-${SSL_SUFFIX}")
 endif()
 
+# Simple DLL/SO name, detailed info only in package names
 set_target_properties(${PROJECT_NAME} PROPERTIES
-    OUTPUT_NAME "${OUTPUT_NAME}"
+    OUTPUT_NAME "neufox-2fa"
     PREFIX ""
 )
 
-message(STATUS "Building ${OUTPUT_NAME} for ${CMAKE_SYSTEM_NAME} ${ARCH_NAME}")
+# Package naming with full details
+set(PACKAGE_NAME "neufox-2fa-${PLATFORM_NAME}-${ARCH_NAME}")
+if(NOT WIN32)
+    set(PACKAGE_NAME "${PACKAGE_NAME}-${SSL_SUFFIX}")
+endif()
+
+message(STATUS "Building neufox-2fa for ${CMAKE_SYSTEM_NAME} ${ARCH_NAME} (package: ${PACKAGE_NAME})")
 if(UNIX AND NOT WIN32 AND ARCH_NAME STREQUAL "x86")
     find_package(PkgConfig REQUIRED)
     set(ENV{PKG_CONFIG_PATH} "/usr/lib/i386-linux-gnu/pkgconfig")
@@ -111,7 +116,7 @@ if(STATIC_STDCXX AND NOT WIN32)
 endif()
 if(WIN32)
     set_target_properties(${PROJECT_NAME} PROPERTIES
-        PDB_NAME "${OUTPUT_NAME}"
+        PDB_NAME "neufox-2fa"
         PDB_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/$<CONFIG>"
     )
 endif()
@@ -134,10 +139,10 @@ set(CPACK_INCLUDE_TOPLEVEL_DIRECTORY OFF)
 if(WIN32)
     set(CPACK_ARCHIVE_COMPONENT_INSTALL ON)
     set(CPACK_COMPONENTS_ALL runtime debug)
-    set(CPACK_ARCHIVE_RUNTIME_FILE_NAME "${OUTPUT_NAME}")
-    set(CPACK_ARCHIVE_DEBUG_FILE_NAME "${OUTPUT_NAME}-debug")
+    set(CPACK_ARCHIVE_RUNTIME_FILE_NAME "${PACKAGE_NAME}")
+    set(CPACK_ARCHIVE_DEBUG_FILE_NAME "${PACKAGE_NAME}-debug")
 else()
-    set(CPACK_ARCHIVE_FILE_NAME "${OUTPUT_NAME}")
+    set(CPACK_ARCHIVE_FILE_NAME "${PACKAGE_NAME}")
 endif()
 
 include(CPack)
