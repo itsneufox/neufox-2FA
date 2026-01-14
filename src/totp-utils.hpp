@@ -9,11 +9,12 @@
  */
 
 #include <cstdint>
-#include <cstddef>
+#include <string>
+#include <optional>
 
 namespace TOTPUtils
 {
-	void generateSecret(char* output, size_t length);
-	bool verifyTOTP(const char* secret, const char* code, uint64_t timestamp, int timeStep = 30, int window = 1);
-	void generateTOTP(const char* secret, uint64_t timestamp, char* output, int timeStep = 30);
+	std::optional<std::string> generateSecret();
+	bool verifyTOTP(const std::string& secret, const std::string& code, uint64_t timestamp, int timeStep = 30, int window = 1);
+	std::string generateTOTP(const std::string& secret, uint64_t timestamp, int timeStep = 30);
 }
