@@ -8,5 +8,7 @@
  *  The original code is copyright (c) 2025, itsneufox.
  */
 
+#ifndef SAMP_PLUGIN_BUILD
 #include <Server/Components/Pawn/Impl/pawn_natives.hpp>
 #include "totp-component.hpp"
+#endif
