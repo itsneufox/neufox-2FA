@@ -9,6 +9,8 @@
  */
 
 #include <sdk.hpp>
+#include <string>
+#include <optional>
 
 // Maximum length for a base32 encoded secret (16 characters = 80 bits)
 constexpr size_t TOTP_SECRET_LENGTH = 16;
@@ -48,7 +50,7 @@ struct ITOTPExtension : IExtension
 struct TOTPEventHandler
 {
 	// Called when a player attempts to verify a TOTP code.
-	virtual void onTOTPVerify(IPlayer& player, bool success, const char* code) = 0;
+	virtual void onTOTPVerify(IPlayer& player, bool success, const std::string& code) = 0;
 
 	// Called when a player enables TOTP.
 	virtual void onTOTPEnabled(IPlayer& player) = 0;
@@ -64,16 +66,16 @@ struct ITOTPComponent : IComponent
 	PROVIDE_UID(0x5572409DBD24A8BB);
 
 	// Generate a new random secret for a player.
-	virtual bool generateSecret(IPlayer& player, char* output) = 0;
+	virtual std::optional<std::string> generateSecret(IPlayer& player) = 0;
 
 	// Enable TOTP for a player with a given secret.
-	virtual bool enableTOTP(IPlayer& player, const char* secret) = 0;
+	virtual bool enableTOTP(IPlayer& player, const std::string& secret) = 0;
 
 	// Disable TOTP for a player.
 	virtual bool disableTOTP(IPlayer& player) = 0;
 
 	// Verify a TOTP code for a player.
-	virtual bool verifyCode(IPlayer& player, const char* code) = 0;
+	virtual bool verifyCode(IPlayer& player, const std::string& code) = 0;
 
 	// Check if a player has TOTP enabled.
 	virtual bool isEnabled(IPlayer& player) = 0;
