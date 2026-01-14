@@ -9,7 +9,7 @@
  */
 
 #include <chrono>
-#include <cstring>
+#include <string>
 
 constexpr size_t TOTP_SECRET_LENGTH_SAMP = 16;
 constexpr int MAX_PLAYERS = 1000;
@@ -18,7 +18,7 @@ struct PlayerTOTPData
 {
 	bool enabled;
 	bool verified;
-	char secret[TOTP_SECRET_LENGTH_SAMP + 1];
+	std::string secret;
 	int failedAttempts;
 	std::chrono::steady_clock::time_point lastAttempt;
 
@@ -28,33 +28,33 @@ struct PlayerTOTPData
 		, failedAttempts(0)
 		, lastAttempt(std::chrono::steady_clock::time_point::min())
 	{
-		secret[0] = '\0';
 	}
 
 	void reset()
 	{
 		enabled = false;
 		verified = false;
-		secret[0] = '\0';
+		secret.clear();
 		failedAttempts = 0;
 		lastAttempt = std::chrono::steady_clock::time_point::min();
 	}
 
 	bool hasSecret() const
 	{
-		return secret[0] != '\0';
+		return !secret.empty();
 	}
 
 	void setSecret(const char* newSecret)
 	{
 		if (newSecret)
 		{
-			strncpy(secret, newSecret, TOTP_SECRET_LENGTH_SAMP);
-			secret[TOTP_SECRET_LENGTH_SAMP] = '\0';
+			secret = newSecret;
+			if (secret.length() > TOTP_SECRET_LENGTH_SAMP)
+				secret.resize(TOTP_SECRET_LENGTH_SAMP);
 		}
 		else
 		{
-			secret[0] = '\0';
+			secret.clear();
 		}
 	}
 };
