@@ -12,6 +12,8 @@ include_directories(
 	sdk/include
 	pawn/source
 	pawn/source/linux
+	samp-sdk
+	samp-sdk/amx
 )
 
 add_definitions(
@@ -19,13 +21,34 @@ add_definitions(
 	-DPAWN_CELL_SIZE=32
 )
 
+# Platform defines for SA-MP SDK
+if(WIN32)
+	add_definitions(-DWIN32)
+else()
+	add_definitions(-DLINUX)
+endif()
+
+# Configure version header
+configure_file(
+	"${CMAKE_CURRENT_SOURCE_DIR}/src/version.hpp.in"
+	"${CMAKE_CURRENT_BINARY_DIR}/version.hpp"
+	@ONLY
+)
+include_directories(${CMAKE_CURRENT_BINARY_DIR})
+
 add_library(${PROJECT_NAME} SHARED
 	src/totp-main.cpp
 	src/totp-natives.cpp
 	src/totp-component.cpp
 	src/totp-extension.cpp
 	src/totp-utils.cpp
+	src/totp-player-data.cpp
 )
+
+# Add module definition file for Windows (exports SA-MP plugin functions)
+if(WIN32)
+	target_sources(${PROJECT_NAME} PRIVATE src/plugin.def)
+endif()
 
 # Determine architecture
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm" OR CMAKE_SYSTEM_PROCESSOR MATCHES "armv7")
@@ -64,7 +87,7 @@ if(UNIX AND NOT WIN32 AND ARCH_NAME STREQUAL "x86")
     find_package(PkgConfig REQUIRED)
     set(ENV{PKG_CONFIG_PATH} "/usr/lib/i386-linux-gnu/pkgconfig")
     pkg_search_module(OPENSSL REQUIRED openssl libcrypto)
-    
+
     message(STATUS "32-bit OpenSSL found:")
     message(STATUS "  Include dirs: ${OPENSSL_INCLUDE_DIRS}")
     message(STATUS "  Library dirs: ${OPENSSL_LIBRARY_DIRS}")
@@ -118,4 +141,3 @@ else()
 endif()
 
 include(CPack)
-

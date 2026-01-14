@@ -1,0 +1,14 @@
+#pragma once
+
+/*
+ *  This Source Code Form is subject to the terms of the Mozilla Public License,
+ *  v. 2.0. If a copy of the MPL was not distributed with this file, You can
+ *  obtain one at http://mozilla.org/MPL/2.0/.
+ *
+ *  The original code is copyright (c) 2025, itsneufox.
+ */
+
+#define PLUGIN_VERSION "@PROJECT_VERSION@"
+#define PLUGIN_VERSION_MAJOR @PROJECT_VERSION_MAJOR@
+#define PLUGIN_VERSION_MINOR @PROJECT_VERSION_MINOR@
+#define PLUGIN_VERSION_PATCH @PROJECT_VERSION_PATCH@
