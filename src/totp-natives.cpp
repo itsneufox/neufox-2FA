@@ -30,12 +30,13 @@ cell AMX_NATIVE_CALL n_TOTP_GenerateSecret(AMX* amx, const cell* params)
 	if (!data)
 		return 0;
 
-	char secret[TOTP_SECRET_LENGTH_SAMP + 1];
-	TOTPUtils::generateSecret(secret, sizeof(secret));
+	auto secret = TOTPUtils::generateSecret();
+	if (!secret)
+		return 0;
 
 	cell* addr;
 	amx_GetAddr(amx, params[2], &addr);
-	amx_SetString(addr, secret, 0, 0, static_cast<size_t>(params[3]));
+	amx_SetString(addr, secret->c_str(), 0, 0, static_cast<size_t>(params[3]));
 
 	return 1;
 }
@@ -177,7 +178,7 @@ cell AMX_NATIVE_CALL n_TOTP_GetSecret(AMX* amx, const cell* params)
 
 	cell* addr;
 	amx_GetAddr(amx, params[2], &addr);
-	amx_SetString(addr, data->secret, 0, 0, static_cast<size_t>(params[3]));
+	amx_SetString(addr, data->secret.c_str(), 0, 0, static_cast<size_t>(params[3]));
 
 	return 1;
 }
@@ -239,10 +240,10 @@ SCRIPT_API(TOTP_GenerateSecret, bool(IPlayer& player, String& output))
 {
 	if (auto totp = TOTPComponent::getInstance())
 	{
-		char secret[TOTP_SECRET_LENGTH + 1];
-		if (totp->generateSecret(player, secret))
+		auto secret = totp->generateSecret(player);
+		if (secret)
 		{
-			output = secret;
+			output = *secret;
 			return true;
 		}
 	}
@@ -255,7 +256,7 @@ SCRIPT_API(TOTP_Enable, bool(IPlayer& player, String const& secret))
 {
 	if (auto totp = TOTPComponent::getInstance())
 	{
-		return totp->enableTOTP(player, secret.c_str());
+		return totp->enableTOTP(player, secret.data());
 	}
 	return false;
 }
@@ -277,7 +278,7 @@ SCRIPT_API(TOTP_Verify, bool(IPlayer& player, String const& code))
 {
 	if (auto totp = TOTPComponent::getInstance())
 	{
-		return totp->verifyCode(player, code.c_str());
+		return totp->verifyCode(player, code.data());
 	}
 	return false;
 }
