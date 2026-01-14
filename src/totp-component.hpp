@@ -30,13 +30,13 @@ private:
 	static constexpr int RATE_LIMIT_SECONDS = 60;
 
 public:
-	bool generateSecret(IPlayer& player, char* output) override;
+	std::optional<std::string> generateSecret(IPlayer& player) override;
 
-	bool enableTOTP(IPlayer& player, const char* secret) override;
+	bool enableTOTP(IPlayer& player, const std::string& secret) override;
 
 	bool disableTOTP(IPlayer& player) override;
 
-	bool verifyCode(IPlayer& player, const char* code) override;
+	bool verifyCode(IPlayer& player, const std::string& code) override;
 
 	bool isEnabled(IPlayer& player) override;
 
