@@ -14,3 +14,6 @@
 	path = pawn
 	url = https://github.com/openmultiplayer/compiler
 
+[submodule "samp-sdk"]
+	path = samp-sdk
+	url = https://github.com/maddinat0r/samp-plugin-sdk.git
