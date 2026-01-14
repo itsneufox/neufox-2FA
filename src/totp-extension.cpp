@@ -33,24 +33,24 @@ void TOTPExtension::setVerified(bool verified)
 
 bool TOTPExtension::hasSecret() const
 {
-	return secret_[0] != '\0';
+	return !secret_.empty();
 }
 
 void TOTPExtension::setSecret(const char* secret)
 {
-	if (secret && strlen(secret) <= TOTP_SECRET_LENGTH)
+	if (secret && std::strlen(secret) <= TOTP_SECRET_LENGTH)
 	{
-		strcpy(secret_, secret);
+		secret_ = secret;
 	}
 	else
 	{
-		secret_[0] = '\0';
+		secret_.clear();
 	}
 }
 
 const char* TOTPExtension::getSecret() const
 {
-	return secret_;
+	return secret_.c_str();
 }
 
 int TOTPExtension::getFailedAttempts() const

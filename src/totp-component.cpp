@@ -12,38 +12,27 @@
 #include "totp-component.hpp"
 #include "totp-extension.hpp"
 #include "totp-utils.hpp"
-#include <ctime>
 #include <chrono>
 
-bool TOTPComponent::generateSecret(IPlayer& player, char* output)
+std::optional<std::string> TOTPComponent::generateSecret(IPlayer& player)
 {
-	if (!output)
-		return false;
-
-	TOTPUtils::generateSecret(output, TOTP_SECRET_LENGTH + 1);
-
-	return true;
+	return TOTPUtils::generateSecret();
 }
 
-bool TOTPComponent::enableTOTP(IPlayer& player, const char* secret)
+bool TOTPComponent::enableTOTP(IPlayer& player, const std::string& secret)
 {
-	if (!secret)
+	if (secret.empty() || secret.length() < 10 || secret.length() > TOTP_SECRET_LENGTH)
 		return false;
 
-	size_t secretLen = strlen(secret);
-	if (secretLen < 10 || secretLen > TOTP_SECRET_LENGTH)
-		return false;
-
-	for (size_t i = 0; i < secretLen; i++)
+	for (char c : secret)
 	{
-		char c = secret[i];
 		if (!((c >= 'A' && c <= 'Z') || (c >= '2' && c <= '7') || (c >= 'a' && c <= 'z')))
 			return false;
 	}
 
 	if (ITOTPExtension* data = queryExtension<ITOTPExtension>(&player))
 	{
-		data->setSecret(secret);
+		data->setSecret(secret.c_str());
 		data->setEnabled(true);
 		data->setVerified(false);
 		data->resetFailedAttempts();
@@ -90,9 +79,9 @@ bool TOTPComponent::disableTOTP(IPlayer& player)
 	return false;
 }
 
-bool TOTPComponent::verifyCode(IPlayer& player, const char* code)
+bool TOTPComponent::verifyCode(IPlayer& player, const std::string& code)
 {
-	if (!code || strlen(code) != 6)
+	if (code.length() != 6)
 		return false;
 
 	ITOTPExtension* data = queryExtension<ITOTPExtension>(&player);

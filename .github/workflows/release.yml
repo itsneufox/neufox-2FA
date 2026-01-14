@@ -20,6 +20,7 @@ on:
           - beta
           - release-candidate
           - stable
+          - security
 
 jobs:
   prepare-version:
@@ -70,6 +71,9 @@ jobs:
           # Create release name based on release type
           if [ "${{ github.event.inputs.release_type }}" = "stable" ]; then
             release_name="v${major_minor}.${build_number}"
+            is_prerelease="false"
+          elif [ "${{ github.event.inputs.release_type }}" = "security" ]; then
+            release_name="Security Update v${major_minor}.${build_number}"
             is_prerelease="false"
           elif [ "${{ github.event.inputs.release_type }}" = "beta" ]; then
             release_name="Beta v${major_minor}.${build_number}"
@@ -145,8 +149,8 @@ jobs:
         New-Item -ItemType Directory -Path artifacts -Force | Out-Null
 
         # Find the DLL and PDB
-        $dllFile = Get-ChildItem -Recurse "build\$config" -Filter "neufox-2fa-*.dll" | Select-Object -First 1
-        $pdbFile = Get-ChildItem -Recurse "build\$config" -Filter "neufox-2fa-*.pdb" | Select-Object -First 1
+        $dllFile = Get-ChildItem -Recurse "build\$config" -Filter "neufox-2fa.dll" | Select-Object -First 1
+        $pdbFile = Get-ChildItem -Recurse "build\$config" -Filter "neufox-2fa.pdb" | Select-Object -First 1
 
         Write-Host "Found DLL: $($dllFile.FullName)"
         Write-Host "Found PDB: $($pdbFile.FullName)"
@@ -335,6 +339,7 @@ jobs:
           - `dynssl`: Dynamically linked OpenSSL (requires libssl on server)
 
           ${{ needs.prepare-version.outputs.is_prerelease == 'true' && '> **Note:** This is a pre-release for testing. Please report any issues!' || '' }}
+          ${{ github.event.inputs.release_type == 'security' && '> **⚠️ Security Update:** This release contains important security fixes. All users are strongly encouraged to update immediately.' || '' }}
 
           ---
 

@@ -1,5 +1,3 @@
-#pragma once
-
 /*
  *  This Source Code Form is subject to the terms of the Mozilla Public License,
  *  v. 2.0. If a copy of the MPL was not distributed with this file, You can
@@ -8,7 +6,6 @@
  *  The original code is copyright (c) 2025, itsneufox.
  */
 
-#ifndef SAMP_PLUGIN_BUILD
-#include <Server/Components/Pawn/Impl/pawn_natives.hpp>
-#include "totp-component.hpp"
-#endif
+#include "totp-player-data.hpp"
+
+PlayerDataManager* PlayerDataManager::instance_ = nullptr;

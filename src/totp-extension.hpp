@@ -9,6 +9,7 @@
  */
 
 #include <sdk.hpp>
+#include <string>
 #include "totp-interface.hpp"
 
 using namespace Impl;
@@ -19,7 +20,7 @@ class TOTPExtension final
 private:
 	bool enabled_;
 	bool verified_;
-	char secret_[TOTP_SECRET_LENGTH + 1];
+	std::string secret_;
 	int failedAttempts_;
 	TimePoint lastAttempt_;
 
@@ -30,7 +31,6 @@ public:
 		, failedAttempts_(0)
 		, lastAttempt_(TimePoint::min())
 	{
-		secret_[0] = '\0';
 	}
 
 	bool isEnabled() const override;

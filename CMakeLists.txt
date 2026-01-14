@@ -12,6 +12,8 @@ include_directories(
 	sdk/include
 	pawn/source
 	pawn/source/linux
+	samp-sdk
+	samp-sdk/amx
 )
 
 add_definitions(
@@ -19,13 +21,34 @@ add_definitions(
 	-DPAWN_CELL_SIZE=32
 )
 
+# Platform defines for SA-MP SDK
+if(WIN32)
+	add_definitions(-DWIN32)
+else()
+	add_definitions(-DLINUX)
+endif()
+
+# Configure version header
+configure_file(
+	"${CMAKE_CURRENT_SOURCE_DIR}/src/version.hpp.in"
+	"${CMAKE_CURRENT_BINARY_DIR}/version.hpp"
+	@ONLY
+)
+include_directories(${CMAKE_CURRENT_BINARY_DIR})
+
 add_library(${PROJECT_NAME} SHARED
 	src/totp-main.cpp
 	src/totp-natives.cpp
 	src/totp-component.cpp
 	src/totp-extension.cpp
 	src/totp-utils.cpp
+	src/totp-player-data.cpp
 )
+
+# Add module definition file for Windows (exports SA-MP plugin functions)
+if(WIN32)
+	target_sources(${PROJECT_NAME} PRIVATE src/plugin.def)
+endif()
 
 # Determine architecture
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm" OR CMAKE_SYSTEM_PROCESSOR MATCHES "armv7")
@@ -48,23 +71,28 @@ endif()
 
 if(WIN32)
     set(PLATFORM_NAME "win")
-    set(OUTPUT_NAME "neufox-2fa-${PLATFORM_NAME}-${ARCH_NAME}")
 else()
     set(PLATFORM_NAME "linux")
-    set(OUTPUT_NAME "neufox-2fa-${PLATFORM_NAME}-${ARCH_NAME}-${SSL_SUFFIX}")
 endif()
 
+# Simple DLL/SO name, detailed info only in package names
 set_target_properties(${PROJECT_NAME} PROPERTIES
-    OUTPUT_NAME "${OUTPUT_NAME}"
+    OUTPUT_NAME "neufox-2fa"
     PREFIX ""
 )
 
-message(STATUS "Building ${OUTPUT_NAME} for ${CMAKE_SYSTEM_NAME} ${ARCH_NAME}")
+# Package naming with full details
+set(PACKAGE_NAME "neufox-2fa-${PLATFORM_NAME}-${ARCH_NAME}")
+if(NOT WIN32)
+    set(PACKAGE_NAME "${PACKAGE_NAME}-${SSL_SUFFIX}")
+endif()
+
+message(STATUS "Building neufox-2fa for ${CMAKE_SYSTEM_NAME} ${ARCH_NAME} (package: ${PACKAGE_NAME})")
 if(UNIX AND NOT WIN32 AND ARCH_NAME STREQUAL "x86")
     find_package(PkgConfig REQUIRED)
     set(ENV{PKG_CONFIG_PATH} "/usr/lib/i386-linux-gnu/pkgconfig")
     pkg_search_module(OPENSSL REQUIRED openssl libcrypto)
-    
+
     message(STATUS "32-bit OpenSSL found:")
     message(STATUS "  Include dirs: ${OPENSSL_INCLUDE_DIRS}")
     message(STATUS "  Library dirs: ${OPENSSL_LIBRARY_DIRS}")
@@ -88,7 +116,7 @@ if(STATIC_STDCXX AND NOT WIN32)
 endif()
 if(WIN32)
     set_target_properties(${PROJECT_NAME} PROPERTIES
-        PDB_NAME "${OUTPUT_NAME}"
+        PDB_NAME "neufox-2fa"
         PDB_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/$<CONFIG>"
     )
 endif()
@@ -111,11 +139,10 @@ set(CPACK_INCLUDE_TOPLEVEL_DIRECTORY OFF)
 if(WIN32)
     set(CPACK_ARCHIVE_COMPONENT_INSTALL ON)
     set(CPACK_COMPONENTS_ALL runtime debug)
-    set(CPACK_ARCHIVE_RUNTIME_FILE_NAME "${OUTPUT_NAME}")
-    set(CPACK_ARCHIVE_DEBUG_FILE_NAME "${OUTPUT_NAME}-debug")
+    set(CPACK_ARCHIVE_RUNTIME_FILE_NAME "${PACKAGE_NAME}")
+    set(CPACK_ARCHIVE_DEBUG_FILE_NAME "${PACKAGE_NAME}-debug")
 else()
-    set(CPACK_ARCHIVE_FILE_NAME "${OUTPUT_NAME}")
+    set(CPACK_ARCHIVE_FILE_NAME "${PACKAGE_NAME}")
 endif()
 
 include(CPack)
-
