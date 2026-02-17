@@ -12,7 +12,7 @@
 #define _INC_neufox_2fa
 
 /**
- * <library name="neufox-2fa" summary="neufox's 2FA - TOTP Two-Factor Authentication Component">
+ * <library name="neufox-2fa" summary="neufox's 2FA - TOTP Two-Factor Authentication Plugin">
  *   <license>
  *     (c) Copyright 2025, neufox.
  *   </license>
@@ -43,149 +43,36 @@ const TOTP_CODE_LENGTH = 6;
 
 /**
  * <library>neufox-2fa</library>
- * <summary>Generate a new random TOTP secret for a player.</summary>
- * <param name="playerid">The ID of the player.</param>
+ * <summary>Generate a new random TOTP secret.</summary>
  * <param name="output">Array to store the generated secret (must be at least 17 characters).</param>
  * <param name="size">Size of the output array.</param>
  * <remarks>
  *   Generates a random 16-character base32 encoded secret that can be used with authenticator apps
  *   like Google Authenticator, Authy, or Microsoft Authenticator.
+ *   This is a stateless function - it does not store the secret anywhere.
+ *   You must store the secret in your database or gamemode variables.
  * </remarks>
  * <returns>
  *   <b><c>true</c></b> - Secret was generated successfully.<br />
  *   <b><c>false</c></b> - Failed to generate secret.
  * </returns>
  */
-native bool:TOTP_GenerateSecret(playerid, output[], size = sizeof(output));
+native bool:TOTP_GenerateSecret(output[], size = sizeof(output));
 
 /**
  * <library>neufox-2fa</library>
- * <summary>Enable TOTP 2FA authentication for a player.</summary>
- * <param name="playerid">The ID of the player.</param>
+ * <summary>Verify a TOTP code against a secret.</summary>
  * <param name="secret">The base32 encoded secret (16 characters).</param>
- * <remarks>
- *   Enables TOTP 2FA for the player. The secret must be a valid 16-character base32 string.
- *   After enabling, the player will need to verify codes using TOTP_Verify.
- * </remarks>
- * <returns>
- *   <b><c>true</c></b> - TOTP was enabled successfully.<br />
- *   <b><c>false</c></b> - Failed to enable TOTP (invalid secret or player not connected).
- * </returns>
- */
-native bool:TOTP_Enable(playerid, const secret[]);
-
-/**
- * <library>neufox-2fa</library>
- * <summary>Disable TOTP 2FA authentication for a player.</summary>
- * <param name="playerid">The ID of the player.</param>
- * <remarks>Disables TOTP 2FA for the player and clears their secret.</remarks>
- * <returns>
- *   <b><c>true</c></b> - TOTP was disabled successfully.<br />
- *   <b><c>false</c></b> - Failed to disable TOTP.
- * </returns>
- */
-native bool:TOTP_Disable(playerid);
-
-/**
- * <library>neufox-2fa</library>
- * <summary>Verify a TOTP code for a player.</summary>
- * <param name="playerid">The ID of the player.</param>
  * <param name="code">The 6-digit TOTP code to verify.</param>
  * <remarks>
- *   Verifies a TOTP code against the player's secret. The code is time-based and changes every 30 seconds.
+ *   Verifies a TOTP code against the provided secret. The code is time-based and changes every 30 seconds.
  *   Includes a time window of ±30 seconds to account for clock drift.
- *   Rate limited to 3 failed attempts per 60 seconds.
+ *   This is a stateless function - it does not track failed attempts or player state.
+ *   You must implement your own rate limiting and state management.
  * </remarks>
  * <returns>
- *   <b><c>true</c></b> - Code is valid and player is now verified.<br />
- *   <b><c>false</c></b> - Code is invalid, TOTP not enabled, or rate limited.
+ *   <b><c>true</c></b> - Code is valid for the given secret.<br />
+ *   <b><c>false</c></b> - Code is invalid or parameters are incorrect.
  * </returns>
  */
-native bool:TOTP_Verify(playerid, const code[]);
-
-/**
- * <library>neufox-2fa</library>
- * <summary>Check if a player has TOTP 2FA enabled.</summary>
- * <param name="playerid">The ID of the player.</param>
- * <returns>
- *   <b><c>true</c></b> - TOTP is enabled for this player.<br />
- *   <b><c>false</c></b> - TOTP is not enabled.
- * </returns>
- */
-native bool:TOTP_IsEnabled(playerid);
-
-/**
- * <library>neufox-2fa</library>
- * <summary>Check if a player is verified with TOTP (has successfully entered a valid code).</summary>
- * <param name="playerid">The ID of the player.</param>
- * <remarks>
- *   Players must verify their TOTP code after connecting if they have TOTP enabled.
- *   This function returns true only after a successful verification.
- * </remarks>
- * <returns>
- *   <b><c>true</c></b> - Player is verified with TOTP.<br />
- *   <b><c>false</c></b> - Player is not verified.
- * </returns>
- */
-native bool:TOTP_IsVerified(playerid);
-
-/**
- * <library>neufox-2fa</library>
- * <summary>Get the player's TOTP secret.</summary>
- * <param name="playerid">The ID of the player.</param>
- * <param name="output">Array to store the secret.</param>
- * <param name="size">Size of the output array.</param>
- * <remarks>
- *   WARNING: Keep secrets secure! Only use this for displaying the secret when first enabling TOTP.
- *   Consider storing secrets in a database instead of retrieving them repeatedly.
- * </remarks>
- * <returns>
- *   <b><c>true</c></b> - Secret was retrieved successfully.<br />
- *   <b><c>false</c></b> - Player has no secret or TOTP is not enabled.
- * </returns>
- */
-native bool:TOTP_GetSecret(playerid, output[], size = sizeof(output));
-
-/**
- * <library>neufox-2fa</library>
- * <summary>Get the number of failed verification attempts for a player.</summary>
- * <param name="playerid">The ID of the player.</param>
- * <remarks>Used for rate limiting. After 3 failed attempts, the player is rate limited for 60 seconds.</remarks>
- * <returns>Number of failed verification attempts.</returns>
- */
-native TOTP_GetFailedAttempts(playerid);
-
-/**
- * <library>neufox-2fa</library>
- * <param name="playerid">The ID of the player who attempted verification.</param>
- * <param name="success">Whether the verification was successful.</param>
- * <summary>This callback is triggered when a player attempts to verify a TOTP code.</summary>
- * <remarks>
- *   This callback is called every time a player tries to verify a TOTP code.
- *   Use this to implement custom authentication flows, logging, or additional security measures.
- * </remarks>
- */
-forward OnPlayerTOTPVerify(playerid, bool:success);
-
-/**
- * <library>neufox-2fa</library>
- * <param name="playerid">The ID of the player who enabled 2FA.</param>
- * <summary>This callback is triggered when a player enables TOTP 2FA.</summary>
- * <remarks>
- *   Called when TOTP_Enable is successfully executed for a player.
- *   Use this for logging, notifications, or database updates.
- * </remarks>
- */
-forward OnPlayerTOTPEnable(playerid);
-
-/**
- * <library>neufox-2fa</library>
- * <param name="playerid">The ID of the player who disabled 2FA.</param>
- * <summary>This callback is triggered when a player disables TOTP 2FA.</summary>
- * <remarks>
- *   Called when TOTP_Disable is successfully executed for a player.
- *   Use this for logging, notifications, or database updates.
- * </remarks>
- */
-forward OnPlayerTOTPDisable(playerid);
-
+native bool:TOTP_Verify(const secret[], const code[]);
