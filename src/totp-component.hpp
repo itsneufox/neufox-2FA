@@ -11,39 +11,17 @@
 #include <sdk.hpp>
 #include "totp-interface.hpp"
 #include <Server/Components/Pawn/pawn.hpp>
-#include <Impl/events_impl.hpp>
-
-using namespace Impl;
 
 class TOTPComponent final
 	: public ITOTPComponent
-	, public PlayerConnectEventHandler
 	, public PawnEventHandler
 {
 private:
 	ICore* core_ = nullptr;
 	IPawnComponent* pawn_ = nullptr;
-	DefaultEventDispatcher<TOTPEventHandler> eventDispatcher_;
 	inline static TOTPComponent* instance_ = nullptr;
 
-	static constexpr int MAX_FAILED_ATTEMPTS = 3;
-	static constexpr int RATE_LIMIT_SECONDS = 60;
-
 public:
-	std::optional<std::string> generateSecret(IPlayer& player) override;
-
-	bool enableTOTP(IPlayer& player, const std::string& secret) override;
-
-	bool disableTOTP(IPlayer& player) override;
-
-	bool verifyCode(IPlayer& player, const std::string& code) override;
-
-	bool isEnabled(IPlayer& player) override;
-
-	bool isVerified(IPlayer& player) override;
-
-	IEventDispatcher<TOTPEventHandler>& getEventDispatcher() override;
-
 	StringView componentName() const override;
 
 	SemanticVersion componentVersion() const override;
@@ -60,7 +38,6 @@ public:
 
 	void reset() override;
 
-	void onPlayerConnect(IPlayer& player) override;
 	void onAmxLoad(IPawnScript& script) override;
 
 	void onAmxUnload(IPawnScript& script) override;
