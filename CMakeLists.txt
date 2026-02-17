@@ -40,9 +40,7 @@ add_library(${PROJECT_NAME} SHARED
 	src/totp-main.cpp
 	src/totp-natives.cpp
 	src/totp-component.cpp
-	src/totp-extension.cpp
 	src/totp-utils.cpp
-	src/totp-player-data.cpp
 )
 
 # Add module definition file for Windows (exports SA-MP plugin functions)
