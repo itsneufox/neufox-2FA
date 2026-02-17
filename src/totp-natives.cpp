@@ -77,6 +77,8 @@ extern "C" const AMX_NATIVE_INFO native_list[] = {
 #include <sdk.hpp>
 #include "totp-interface.hpp"
 
+using namespace Impl;
+
 // native bool:TOTP_GenerateSecret(output[], size = sizeof(output));
 SCRIPT_API(TOTP_GenerateSecret, bool(String& output))
 {
