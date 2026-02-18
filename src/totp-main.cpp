@@ -7,7 +7,6 @@
  */
 
 #include "totp-plugin.hpp"
-#include "totp-player-data.hpp"
 #include "version.hpp"
 
 // ============================================================================
@@ -45,8 +44,6 @@ PLUGIN_EXPORT bool PLUGIN_CALL Load(void** ppData)
 
 PLUGIN_EXPORT void PLUGIN_CALL Unload()
 {
-	PlayerDataManager::Destroy();
-
 	logprintf(" ");
 	logprintf(" neufox-2fa: Plugin unloaded.");
 	logprintf(" ");

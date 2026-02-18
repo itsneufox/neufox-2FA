@@ -8,159 +8,7 @@
 
 #include <Server/Components/Pawn/Impl/pawn_natives.hpp>
 #include <Server/Components/Pawn/Impl/pawn_impl.hpp>
-#include <Impl/events_impl.hpp>
 #include "totp-component.hpp"
-#include "totp-extension.hpp"
-#include "totp-utils.hpp"
-#include <chrono>
-
-std::optional<std::string> TOTPComponent::generateSecret(IPlayer& player)
-{
-	return TOTPUtils::generateSecret();
-}
-
-bool TOTPComponent::enableTOTP(IPlayer& player, const std::string& secret)
-{
-	if (secret.empty() || secret.length() < 10 || secret.length() > TOTP_SECRET_LENGTH)
-		return false;
-
-	for (char c : secret)
-	{
-		if (!((c >= 'A' && c <= 'Z') || (c >= '2' && c <= '7') || (c >= 'a' && c <= 'z')))
-			return false;
-	}
-
-	if (ITOTPExtension* data = queryExtension<ITOTPExtension>(&player))
-	{
-		data->setSecret(secret.c_str());
-		data->setEnabled(true);
-		data->setVerified(false);
-		data->resetFailedAttempts();
-		eventDispatcher_.dispatch(&TOTPEventHandler::onTOTPEnabled, player);
-
-		if (pawn_)
-		{
-			int playerID = player.getID();
-			for (IPawnScript* script : pawn_->sideScripts())
-				script->Call("OnPlayerTOTPEnable", DefaultReturnValue_False, playerID);
-
-			if (auto script = pawn_->mainScript())
-				script->Call("OnPlayerTOTPEnable", DefaultReturnValue_False, playerID);
-		}
-
-		return true;
-	}
-
-	return false;
-}
-
-bool TOTPComponent::disableTOTP(IPlayer& player)
-{
-	if (ITOTPExtension* data = queryExtension<ITOTPExtension>(&player))
-	{
-		data->setEnabled(false);
-		data->setVerified(false);
-		data->setSecret("");
-		eventDispatcher_.dispatch(&TOTPEventHandler::onTOTPDisabled, player);
-
-		if (pawn_)
-		{
-			int playerID = player.getID();
-			for (IPawnScript* script : pawn_->sideScripts())
-				script->Call("OnPlayerTOTPDisable", DefaultReturnValue_False, playerID);
-
-			if (auto script = pawn_->mainScript())
-				script->Call("OnPlayerTOTPDisable", DefaultReturnValue_False, playerID);
-		}
-
-		return true;
-	}
-
-	return false;
-}
-
-bool TOTPComponent::verifyCode(IPlayer& player, const std::string& code)
-{
-	if (code.length() != 6)
-		return false;
-
-	ITOTPExtension* data = queryExtension<ITOTPExtension>(&player);
-	if (!data || !data->isEnabled() || !data->hasSecret())
-		return false;
-
-	auto nowSteady = std::chrono::steady_clock::now();
-	TimePoint nowTimePoint = std::chrono::time_point_cast<Microseconds>(nowSteady);
-
-	if (data->getFailedAttempts() >= MAX_FAILED_ATTEMPTS)
-	{
-		auto timeSinceLastAttempt = std::chrono::duration_cast<std::chrono::seconds>(
-			nowTimePoint - data->getLastAttempt()
-		).count();
-
-		if (timeSinceLastAttempt < RATE_LIMIT_SECONDS)
-			return false;
-		else
-			data->resetFailedAttempts();
-	}
-
-	data->setLastAttempt(nowTimePoint);
-
-	auto nowSystem = std::chrono::system_clock::now();
-	uint64_t timestamp = std::chrono::duration_cast<std::chrono::seconds>(
-		nowSystem.time_since_epoch()
-	).count();
-
-	bool success = TOTPUtils::verifyTOTP(data->getSecret(), code, timestamp);
-
-	if (success)
-	{
-		data->setVerified(true);
-		data->resetFailedAttempts();
-	}
-	else
-	{
-		data->incrementFailedAttempts();
-	}
-
-	eventDispatcher_.dispatch(&TOTPEventHandler::onTOTPVerify, player, success, code);
-
-	if (pawn_)
-	{
-		int playerID = player.getID();
-		for (IPawnScript* script : pawn_->sideScripts())
-			script->Call("OnPlayerTOTPVerify", DefaultReturnValue_False, playerID, success);
-
-		if (auto script = pawn_->mainScript())
-		{
-			script->Call("OnPlayerTOTPVerify", DefaultReturnValue_False, playerID, success);
-		}
-	}
-
-	return success;
-}
-
-bool TOTPComponent::isEnabled(IPlayer& player)
-{
-	if (ITOTPExtension* data = queryExtension<ITOTPExtension>(&player))
-	{
-		return data->isEnabled();
-	}
-	return false;
-}
-
-bool TOTPComponent::isVerified(IPlayer& player)
-{
-	if (ITOTPExtension* data = queryExtension<ITOTPExtension>(&player))
-	{
-		return data->isVerified();
-	}
-	return false;
-}
-
-IEventDispatcher<TOTPEventHandler>& TOTPComponent::getEventDispatcher()
-{
-	return eventDispatcher_;
-}
 
 StringView TOTPComponent::componentName() const
 {
@@ -175,7 +23,6 @@ SemanticVersion TOTPComponent::componentVersion() const
 void TOTPComponent::onLoad(ICore* c)
 {
 	core_ = c;
-	core_->getPlayers().getPlayerConnectDispatcher().addEventHandler(this);
 	setAmxLookups(core_);
 }
 
@@ -212,21 +59,7 @@ void TOTPComponent::free()
 
 void TOTPComponent::reset()
 {
-	if (core_)
-	{
-		for (IPlayer* player : core_->getPlayers().entries())
-		{
-			if (ITOTPExtension* data = queryExtension<ITOTPExtension>(player))
-			{
-				data->reset();
-			}
-		}
-	}
-}
-
-void TOTPComponent::onPlayerConnect(IPlayer& player)
-{
-	player.addExtension(new TOTPExtension(), true);
+	// Stateless - nothing to reset
 }
 
 void TOTPComponent::onAmxLoad(IPawnScript& script)
@@ -252,9 +85,5 @@ TOTPComponent::~TOTPComponent()
 	if (pawn_)
 	{
 		pawn_->getEventDispatcher().removeEventHandler(this);
-	}
-	if (core_)
-	{
-		core_->getPlayers().getPlayerConnectDispatcher().removeEventHandler(this);
 	}
 }
